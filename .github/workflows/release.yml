@@ -97,7 +97,14 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+        env:
+          npm_config_msvs_version: "2022"
+
+      - name: Rebuild native addons
+        run: npx electron-rebuild -f -w naudiodon
+        env:
+          npm_config_msvs_version: "2022"
 
       - name: Build installer
         run: npm run make

@@ -9,6 +9,8 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
 const config: ForgeConfig = {
   packagerConfig: {
+    // Point to assets/icon — Forge appends .ico on Windows, .icns on macOS, .png on Linux
+    icon: "./assets/icon",
     asar: {
       // naudiodon ships a native .node binary — it cannot be read from inside an asar archive
       unpack: "**/node_modules/naudiodon/**",
