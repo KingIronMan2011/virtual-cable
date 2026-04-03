@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import packageJson from "../../../package.json";
 import type { UpdateState } from "../../updater/updater";
 import type { AppSettings } from "../../store/settingsStore";
 
@@ -7,7 +8,7 @@ interface Props {
   onClose: () => void;
 }
 
-const VERSION = "1.0.0";
+const VERSION = packageJson.version;
 
 const STATUS_LABEL: Record<UpdateState["status"], string> = {
   idle: "",

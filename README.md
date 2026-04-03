@@ -89,13 +89,13 @@ Inside that folder you will find:
 
 | File                             | Description                                    |
 | -------------------------------- | ---------------------------------------------- |
-| `virtual-cable-1.0.0 Setup.exe`  | The installer — run this to install the app    |
-| `virtual-cable-1.0.0-full.nupkg` | Squirrel update package                        |
+| `virtual-cable-1.X.X Setup.exe`  | The installer — run this to install the app    |
+| `virtual-cable-1.X.X-full.nupkg` | Squirrel update package                        |
 | `RELEASES`                       | Release manifest used by Squirrel auto-updater |
 
 #### Installing
 
-1. Run `virtual-cable-1.0.0 Setup.exe`
+1. Run `virtual-cable-1.X.X Setup.exe`
 2. The app installs silently and launches automatically
 3. After installation, find it in:
    - **Start Menu** → Virtual Cable
