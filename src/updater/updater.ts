@@ -29,7 +29,7 @@ export function setupUpdater(mainWin: BrowserWindow): void {
   if (!app.isPackaged) return;
 
   // Replace with your Hazel deployment URL (e.g. https://your-hazel.vercel.app)
-  const HAZEL_URL = "https://your-hazel.vercel.app";
+  const HAZEL_URL = "https://vc-upd.kingironman.dev";
   const feedUrl = `${HAZEL_URL}/update/${process.platform}/${app.getVersion()}`;
 
   try {
@@ -55,11 +55,7 @@ export function setupUpdater(mainWin: BrowserWindow): void {
 
   autoUpdater.on(
     "update-downloaded",
-    (
-      _event: Electron.Event,
-      _releaseNotes: string,
-      releaseName: string,
-    ) => {
+    (_event: Electron.Event, _releaseNotes: string, releaseName: string) => {
       push({ status: "ready", version: releaseName });
     },
   );

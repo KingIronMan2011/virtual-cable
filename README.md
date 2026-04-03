@@ -87,11 +87,11 @@ out/make/squirrel.windows/x64/
 
 Inside that folder you will find:
 
-| File | Description |
-| ------ | ------------- |
-| `virtual-cable-1.0.0 Setup.exe` | The installer — run this to install the app |
-| `virtual-cable-1.0.0-full.nupkg` | Squirrel update package |
-| `RELEASES` | Release manifest used by Squirrel auto-updater |
+| File                             | Description                                    |
+| -------------------------------- | ---------------------------------------------- |
+| `virtual-cable-1.0.0 Setup.exe`  | The installer — run this to install the app    |
+| `virtual-cable-1.0.0-full.nupkg` | Squirrel update package                        |
+| `RELEASES`                       | Release manifest used by Squirrel auto-updater |
 
 #### Installing
 
@@ -126,14 +126,14 @@ VB-Audio Virtual Cable is free software by VB-Audio Software.
 
 ## Tech stack
 
-| Layer | Technology |
-| ------- | ----------- |
-| Shell | Electron 41 |
-| UI | React 19 + TypeScript |
-| Styling | Tailwind CSS v4 |
-| Build | Electron Forge v7 + Vite |
-| Audio | naudiodon (PortAudio binding) |
-| Installer | Squirrel.Windows |
+| Layer     | Technology                    |
+| --------- | ----------------------------- |
+| Shell     | Electron 41                   |
+| UI        | React 19 + TypeScript         |
+| Styling   | Tailwind CSS v4               |
+| Build     | Electron Forge v7 + Vite      |
+| Audio     | naudiodon (PortAudio binding) |
+| Installer | Squirrel.Windows              |
 
 ---
 

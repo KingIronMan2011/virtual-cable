@@ -29,7 +29,9 @@ const STATUS_CLASS: Record<UpdateState["status"], string> = {
 
 export default function SettingsPanel({ open, onClose }: Props) {
   const [settings, setSettings] = useState<AppSettings>({ autoUpdate: false });
-  const [updateState, setUpdateState] = useState<UpdateState>({ status: "idle" });
+  const [updateState, setUpdateState] = useState<UpdateState>({
+    status: "idle",
+  });
 
   // Load settings and current update state on open
   useEffect(() => {
@@ -102,7 +104,9 @@ export default function SettingsPanel({ open, onClose }: Props) {
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Built with</span>
-                <span className="settings-row-val">Electron · React · PortAudio</span>
+                <span className="settings-row-val">
+                  Electron · React · PortAudio
+                </span>
               </div>
             </div>
           </section>

@@ -7,7 +7,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getDevices: (): Promise<AudioDevice[]> =>
     ipcRenderer.invoke("audio:getDevices"),
 
-  createTunnel: (id: string, inputId: number, outputId: number): Promise<void> =>
+  createTunnel: (
+    id: string,
+    inputId: number,
+    outputId: number,
+  ): Promise<void> =>
     ipcRenderer.invoke("audio:createTunnel", id, inputId, outputId),
 
   destroyTunnel: (id: string): Promise<void> =>
@@ -21,7 +25,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   downloadAndInstallVBAudio: (): Promise<void> =>
     ipcRenderer.invoke("vbaudio:downloadAndInstall"),
 
-  onVBAudioProgress: (cb: (stage: string, pct?: number) => void): (() => void) => {
+  onVBAudioProgress: (
+    cb: (stage: string, pct?: number) => void,
+  ): (() => void) => {
     const listener = (_: unknown, data: { stage: string; pct?: number }) =>
       cb(data.stage, data.pct);
     ipcRenderer.on("vbaudio:progress", listener);
@@ -42,7 +48,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   installUpdate: (): Promise<void> => ipcRenderer.invoke("update:install"),
 
-  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke("update:getState"),
+  getUpdateState: (): Promise<UpdateState> =>
+    ipcRenderer.invoke("update:getState"),
 
   onUpdateStatus: (cb: (state: UpdateState) => void): (() => void) => {
     const listener = (_: unknown, state: UpdateState) => cb(state);

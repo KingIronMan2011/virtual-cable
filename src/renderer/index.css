@@ -796,7 +796,9 @@ body::after {
   line-height: 1;
   transition: color 0.15s;
 }
-.header-settings-btn:hover { color: var(--color-text); }
+.header-settings-btn:hover {
+  color: var(--color-text);
+}
 
 /* ─────────────────────────────────────────────────────────────────
    Settings Panel
@@ -830,7 +832,9 @@ body::after {
   transition: transform 0.25s ease;
   overflow: hidden;
 }
-.settings-panel.is-open { transform: translateX(0); }
+.settings-panel.is-open {
+  transform: translateX(0);
+}
 
 .settings-header {
   display: flex;
@@ -861,7 +865,9 @@ body::after {
   font-family: var(--font-mono);
   transition: color 0.15s;
 }
-.settings-close:hover { color: var(--color-text); }
+.settings-close:hover {
+  color: var(--color-text);
+}
 
 .settings-body {
   flex: 1;
@@ -874,7 +880,9 @@ body::after {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 20px;
 }
-.settings-section + .settings-section { padding-top: 20px; }
+.settings-section + .settings-section {
+  padding-top: 20px;
+}
 
 .settings-section-title {
   display: block;
@@ -938,7 +946,9 @@ body::after {
   text-align: right;
   word-break: break-all;
 }
-.update-version { color: var(--color-active); }
+.update-version {
+  color: var(--color-active);
+}
 
 /* Update status chip */
 .update-status {
@@ -952,11 +962,26 @@ body::after {
   border: 1px solid var(--color-border-hi);
   color: var(--color-muted);
 }
-.update-status--checking  { color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 30%, transparent); }
-.update-status--available { color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 30%, transparent); }
-.update-status--ok        { color: var(--color-active); border-color: color-mix(in srgb, var(--color-active) 30%, transparent); }
-.update-status--ready     { color: var(--color-active); border-color: color-mix(in srgb, var(--color-active) 30%, transparent); }
-.update-status--error     { color: #e84848; border-color: color-mix(in srgb, #e84848 30%, transparent); }
+.update-status--checking {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+.update-status--available {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+.update-status--ok {
+  color: var(--color-active);
+  border-color: color-mix(in srgb, var(--color-active) 30%, transparent);
+}
+.update-status--ready {
+  color: var(--color-active);
+  border-color: color-mix(in srgb, var(--color-active) 30%, transparent);
+}
+.update-status--error {
+  color: #e84848;
+  border-color: color-mix(in srgb, #e84848 30%, transparent);
+}
 
 .update-progress-bar {
   width: 100%;
@@ -1046,7 +1071,9 @@ body::after {
   top: 3px;
   background: var(--color-muted);
   border-radius: 50%;
-  transition: transform 0.2s, background 0.2s;
+  transition:
+    transform 0.2s,
+    background 0.2s;
 }
 .toggle-switch input:checked + .toggle-slider {
   background: color-mix(in srgb, var(--color-active) 30%, transparent);

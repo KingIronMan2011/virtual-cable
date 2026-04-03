@@ -6,7 +6,11 @@ declare global {
   interface Window {
     electronAPI: {
       getDevices(): Promise<AudioDevice[]>;
-      createTunnel(id: string, inputId: number, outputId: number): Promise<void>;
+      createTunnel(
+        id: string,
+        inputId: number,
+        outputId: number,
+      ): Promise<void>;
       destroyTunnel(id: string): Promise<void>;
       checkVBAudioInstalled(): Promise<boolean>;
       installVBAudio(): Promise<void>;

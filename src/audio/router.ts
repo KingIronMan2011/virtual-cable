@@ -10,7 +10,11 @@ const activeTunnels = new Map<string, StreamPair>();
 
 function tryQuit(stream: InstanceType<typeof AudioIO> | null): void {
   if (!stream) return;
-  try { stream.quit(); } catch { /* already closed */ }
+  try {
+    stream.quit();
+  } catch {
+    /* already closed */
+  }
 }
 
 /**
@@ -63,9 +67,11 @@ export function createTunnel(
   // If routing fell back to WASAPI (no MME equivalent found), use the
   // output device's reported default rate which is the safest single choice.
   const sampleRate =
-    (inputInfo?.hostAPIName === "MME" || outputInfo?.hostAPIName === "MME")
+    inputInfo?.hostAPIName === "MME" || outputInfo?.hostAPIName === "MME"
       ? 48000
-      : (outputInfo?.defaultSampleRate ?? inputInfo?.defaultSampleRate ?? 48000);
+      : (outputInfo?.defaultSampleRate ??
+        inputInfo?.defaultSampleRate ??
+        48000);
 
   const input = new AudioIO({
     inOptions: {
