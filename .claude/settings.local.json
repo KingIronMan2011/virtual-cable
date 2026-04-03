@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx electron:*)",
+      "Bash(timeout 6 npx electron-forge start)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "mcp__plugin_microsoft-docs_microsoft-learn__microsoft_docs_search",
+      "Bash(npm search:*)",
+      "Read(//tmp/**)",
+      "Bash(where cl.exe)",
+      "Bash(where msbuild.exe)",
+      "Bash(node:*)",
+      "Bash(npm view:*)",
+      "Bash(timeout 12 npx electron-forge start)",
+      "Bash(timeout 20 npx electron-forge start)"
+    ]
+  }
+}

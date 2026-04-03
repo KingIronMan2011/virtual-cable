@@ -1,0 +1,1 @@
+claude --resume "virtual-cable-electron-app"
