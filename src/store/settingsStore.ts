@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { app } from "electron";
 
@@ -12,7 +12,7 @@ const DEFAULTS: AppSettings = {
 
 function storePath(): string {
   const dir = app.getPath("userData");
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
   return join(dir, "settings.json");
 }
 

@@ -47,24 +47,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── 2. Build on each platform and upload assets ───────────────────────────
-  build:
-    name: Build — ${{ matrix.name }}
+  build-mac:
+    name: Build — MacOS
     needs: prepare
     if: needs.prepare.outputs.should_build == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows
-            os: windows-latest
-          # macos-latest is Apple Silicon (arm64).
-          # The x64 build runs on all Macs via Rosetta 2 — use macos-13 if
-          # you need to target Intel Macs natively.
-          - name: macOS
-            os: macos-latest
-
-    runs-on: ${{ matrix.os }}
-
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -83,29 +70,10 @@ jobs:
         env:
           npm_config_msvs_version: "2022"
 
-      - name: Install 7-Zip (Windows — required by Squirrel)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install 7zip -y
-          echo "C:\Program Files\7-Zip" >> $env:GITHUB_PATH
-
       - name: Build
         run: npm run make
 
-      - name: Upload assets (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          gh release upload "v${{ needs.prepare.outputs.version }}" \
-            out/make/squirrel.windows/x64/*.exe \
-            out/make/squirrel.windows/x64/*.nupkg \
-            out/make/squirrel.windows/x64/RELEASES \
-            --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload assets (macOS)
+      - name: Upload assets
         if: runner.os == 'macOS'
         run: |
           gh release upload "v${{ needs.prepare.outputs.version }}" \
@@ -114,10 +82,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  build-win:
+    name: Build — Windows
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run make
+
+      - name: Create GitHub release
+        shell: bash
+        run: |
+          gh release create "v${{ needs.prepare.outputs.version }}" \
+            out/make/squirrel.windows/x64/*.exe \
+            out/make/squirrel.windows/x64/*.nupkg \
+            out/make/squirrel.windows/x64/RELEASES
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # ── 3. Publish once all platform builds have uploaded ─────────────────────
   publish:
     name: Publish release
-    needs: [prepare, build]
+    needs: [prepare, build-win, build-mac]
     if: needs.prepare.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 

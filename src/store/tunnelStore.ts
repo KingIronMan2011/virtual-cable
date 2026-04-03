@@ -1,11 +1,11 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { app } from "electron";
 import type { Tunnel } from "../types";
 
 function storePath(): string {
   const dir = app.getPath("userData");
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
   return join(dir, "tunnels.json");
 }
 
