@@ -1,17 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { AudioDevice, Tunnel } from "./types";
+import type { AppSettings } from "./store/settingsStore";
+import type { UpdateState } from "./updater/updater";
 
-// Expose a typed, narrow API to the renderer. The renderer cannot call ipcRenderer
-// directly — it can only use what is explicitly exposed here via contextBridge.
 contextBridge.exposeInMainWorld("electronAPI", {
   getDevices: (): Promise<AudioDevice[]> =>
     ipcRenderer.invoke("audio:getDevices"),
 
-  createTunnel: (
-    id: string,
-    inputId: number,
-    outputId: number,
-  ): Promise<void> =>
+  createTunnel: (id: string, inputId: number, outputId: number): Promise<void> =>
     ipcRenderer.invoke("audio:createTunnel", id, inputId, outputId),
 
   destroyTunnel: (id: string): Promise<void> =>
@@ -25,13 +21,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   downloadAndInstallVBAudio: (): Promise<void> =>
     ipcRenderer.invoke("vbaudio:downloadAndInstall"),
 
-  onVBAudioProgress: (
-    cb: (stage: string, pct?: number) => void,
-  ): (() => void) => {
+  onVBAudioProgress: (cb: (stage: string, pct?: number) => void): (() => void) => {
     const listener = (_: unknown, data: { stage: string; pct?: number }) =>
       cb(data.stage, data.pct);
     ipcRenderer.on("vbaudio:progress", listener);
-    // Return an unsubscribe function so the renderer can clean up
     return () => ipcRenderer.removeListener("vbaudio:progress", listener);
   },
 
@@ -39,4 +32,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   saveTunnels: (tunnels: Tunnel[]): Promise<void> =>
     ipcRenderer.invoke("store:saveTunnels", tunnels),
+
+  loadSettings: (): Promise<AppSettings> => ipcRenderer.invoke("settings:load"),
+
+  saveSettings: (settings: AppSettings): Promise<void> =>
+    ipcRenderer.invoke("settings:save", settings),
+
+  checkForUpdates: (): Promise<void> => ipcRenderer.invoke("update:check"),
+
+  installUpdate: (): Promise<void> => ipcRenderer.invoke("update:install"),
+
+  getUpdateState: (): Promise<UpdateState> => ipcRenderer.invoke("update:getState"),
+
+  onUpdateStatus: (cb: (state: UpdateState) => void): (() => void) => {
+    const listener = (_: unknown, state: UpdateState) => cb(state);
+    ipcRenderer.on("update:status", listener);
+    return () => ipcRenderer.removeListener("update:status", listener);
+  },
 });

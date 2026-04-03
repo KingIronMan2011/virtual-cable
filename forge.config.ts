@@ -16,7 +16,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {
     onlyModules: ["naudiodon"],
-    forceRebuild: true,
+    force: true,
   },
   makers: [
     new MakerSquirrel({ name: "virtual_cable" }),

@@ -9,9 +9,16 @@ import {
   downloadAndInstall,
 } from "./vbaudio/installer";
 import { loadTunnels, saveTunnels } from "./store/tunnelStore";
+import { loadSettings, saveSettings } from "./store/settingsStore";
+import {
+  setupUpdater,
+  checkForUpdates,
+  installUpdate,
+  getUpdateState,
+} from "./updater/updater";
 import type { Tunnel } from "./types";
+import type { AppSettings } from "./store/settingsStore";
 
-// Handle Squirrel Windows installer events — quit immediately during install/update
 if (started) app.quit();
 
 function createWindow(): void {
@@ -20,13 +27,10 @@ function createWindow(): void {
     height: 700,
     minWidth: 700,
     minHeight: 500,
-    // Prevent white flash before React renders
-    backgroundColor: "#0f172a",
+    backgroundColor: "#0c0b09",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      // sandbox: false is required so the preload can access ipcRenderer from Electron.
-      // contextIsolation: true still sandboxes the renderer — it cannot reach Node APIs.
       sandbox: false,
       nodeIntegration: false,
     },
@@ -39,6 +43,17 @@ function createWindow(): void {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
+
+  // Set up auto-updater after window is ready
+  setupUpdater(win);
+
+  // Run auto-update check on startup if the user has it enabled
+  win.webContents.once("did-finish-load", () => {
+    const settings = loadSettings();
+    if (settings.autoUpdate) {
+      checkForUpdates();
+    }
+  });
 }
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────
@@ -62,7 +77,6 @@ ipcMain.handle("vbaudio:install", () => openInstallPage());
 
 ipcMain.handle("vbaudio:downloadAndInstall", async (event) => {
   await downloadAndInstall((stage, pct) => {
-    // Push progress events back to the renderer that made the call
     event.sender.send("vbaudio:progress", { stage, pct });
   });
 });
@@ -72,6 +86,18 @@ ipcMain.handle("store:loadTunnels", () => loadTunnels());
 ipcMain.handle("store:saveTunnels", (_event, tunnels: Tunnel[]) =>
   saveTunnels(tunnels),
 );
+
+ipcMain.handle("settings:load", () => loadSettings());
+
+ipcMain.handle("settings:save", (_event, settings: AppSettings) =>
+  saveSettings(settings),
+);
+
+ipcMain.handle("update:check", () => checkForUpdates());
+
+ipcMain.handle("update:install", () => installUpdate());
+
+ipcMain.handle("update:getState", () => getUpdateState());
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 

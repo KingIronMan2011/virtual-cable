@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { AudioDevice, Tunnel } from "../types";
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
+import SettingsPanel from "./components/SettingsPanel";
 
 type InstallState =
   | "idle"
@@ -17,6 +18,7 @@ export default function App() {
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
   const [vbModalOpen, setVbModalOpen] = useState(false);
   const [vbToastDismissed, setVbToastDismissed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [installState, setInstallState] = useState<InstallState>("idle");
   const [installPct, setInstallPct] = useState(0);
   const [installError, setInstallError] = useState("");
@@ -152,6 +154,14 @@ export default function App() {
               <span className="meta-vb-ok">VB-Audio</span>
             </>
           )}
+          <div className="meta-divider" />
+          <button
+            className="header-settings-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+          >
+            ⚙
+          </button>
         </div>
       </header>
 
@@ -250,6 +260,11 @@ export default function App() {
           )}
         </div>
       )}
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       <VBInstallModal
         open={vbModalOpen}
