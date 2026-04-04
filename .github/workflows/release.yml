@@ -8,58 +8,95 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & Release
-    runs-on: windows-latest
+  # ── 1. Read version and decide whether to build ───────────────────────────
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_build: ${{ steps.check.outputs.should_build }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+      - uses: actions/checkout@v5
 
       - name: Get version from package.json
         id: version
-        shell: bash
         run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
 
       - name: Check if release already exists
         id: check
-        shell: bash
         run: |
           if gh release view "v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "should_build=false" >> $GITHUB_OUTPUT
             echo "Release v${{ steps.version.outputs.version }} already exists — skipping."
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Release v${{ steps.version.outputs.version }} not found — will build and publish."
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Release v${{ steps.version.outputs.version }} not found — will build."
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # ── 2. Build the Windows installer ────────────────────────────────────────
+  build:
+    name: Build
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
       - name: Install dependencies
-        if: steps.check.outputs.exists == 'false'
-        run: npm ci
+        run: npm ci --ignore-scripts
+        env:
+          npm_config_msvs_version: "2022"
+
+      - name: Rebuild native addons
+        run: npx electron-rebuild -f -w naudiodon
+        env:
+          npm_config_msvs_version: "2022"
 
       - name: Build icons
-        if: steps.check.outputs.exists == 'false'
         run: npm run build:icons
 
       - name: Build installer
-        if: steps.check.outputs.exists == 'false'
         run: npm run make
+        env:
+          npm_config_msvs_version: "2022"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: squirrel-windows
+          path: out/make/squirrel.windows/x64/
+
+  # ── 3. Publish the GitHub release ─────────────────────────────────────────
+  release:
+    name: Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: squirrel-windows
+          path: artifacts/
 
       - name: Create GitHub release
-        if: steps.check.outputs.exists == 'false'
-        shell: bash
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" \
-            --title "v${{ steps.version.outputs.version }}" \
+          gh release create "v${{ needs.prepare.outputs.version }}" \
+            --title "v${{ needs.prepare.outputs.version }}" \
             --generate-notes \
-            out/make/squirrel.windows/x64/*.exe \
-            out/make/squirrel.windows/x64/*.nupkg \
-            out/make/squirrel.windows/x64/RELEASES
+            artifacts/*.exe \
+            artifacts/*.nupkg \
+            artifacts/RELEASES
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

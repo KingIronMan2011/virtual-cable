@@ -17,7 +17,9 @@
       "Bash(timeout 12 npx electron-forge start)",
       "Bash(timeout 20 npx electron-forge start)",
       "Bash(npm run:*)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(npm audit:*)",
+      "Bash(npm show:*)"
     ]
   }
 }
