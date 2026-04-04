@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { X } from "lucide-react";
 import packageJson from "../../../package.json";
 import type { UpdateState } from "../../updater/updater";
 import type { AppSettings, BufferSize } from "../../types";
@@ -95,7 +96,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
         <div className="settings-header">
           <span className="settings-title">Settings</span>
           <button className="settings-close" onClick={onClose}>
-            ✕
+            <X size={15} strokeWidth={2} />
           </button>
         </div>
 

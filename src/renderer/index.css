@@ -484,19 +484,6 @@ body::after {
     inset 0 0 12px color-mix(in srgb, var(--color-active) 5%, transparent);
 }
 
-.toggle-led {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  transition: box-shadow 0.2s;
-}
-
-.cable-toggle.is-active .toggle-led {
-  box-shadow:
-    0 0 5px var(--color-active),
-    0 0 2px var(--color-active);
-}
 
 /* ─────────────────────────────────────────────────────────────────
    Mute Button
@@ -676,6 +663,9 @@ body::after {
 }
 
 .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 7px 16px;
   font-family: var(--font-mono);
   font-size: 0.65rem;
@@ -795,6 +785,9 @@ body::after {
 }
 
 .vb-toast-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 12px;
   font-family: var(--font-display);
   font-weight: 700;

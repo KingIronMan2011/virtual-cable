@@ -1,4 +1,14 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  Hexagon,
+  Plus,
+  RefreshCw,
+  Settings,
+  X,
+} from "lucide-react";
 import type { AudioDevice, Tunnel, InstallState, AppSettings } from "../types";
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
@@ -182,14 +192,17 @@ export default function App() {
           </div>
           <div className="meta-divider" />
           {vbInstalled === true ? (
-            <span className="meta-vb-ok">VB-Audio ✓</span>
+            <span className="meta-vb-ok">
+              <CheckCircle2 size={13} strokeWidth={2.5} />
+              VB-Audio
+            </span>
           ) : (
             <button
               className="header-rescan-btn"
               onClick={rescanDevices}
               title="Re-scan audio devices"
             >
-              ↺
+              <RefreshCw size={14} strokeWidth={2} />
             </button>
           )}
           <div className="meta-divider" />
@@ -198,7 +211,7 @@ export default function App() {
             onClick={() => setSettingsOpen(true)}
             title="Settings"
           >
-            ⚙
+            <Settings size={15} strokeWidth={1.75} />
           </button>
         </div>
       </header>
@@ -218,7 +231,7 @@ export default function App() {
       </main>
 
       <button className="fab-new" onClick={addTunnel}>
-        <span style={{ fontSize: "0.75rem", lineHeight: 1 }}>+</span>
+        <Plus size={14} strokeWidth={2.5} />
         New Cable
       </button>
 
@@ -227,7 +240,7 @@ export default function App() {
         <div className="vb-toast">
           <div className="vb-toast-content">
             <div className="vb-toast-row">
-              <span className="vb-toast-icon">⬡</span>
+              <span className="vb-toast-icon"><Hexagon size={18} strokeWidth={1.5} /></span>
               <div className="vb-toast-text">
                 <span className="vb-toast-title">VB-Audio not detected</span>
                 <span className="vb-toast-sub">
@@ -241,13 +254,13 @@ export default function App() {
               className="vb-toast-install"
               onClick={() => setVbModalOpen(true)}
             >
-              Install ↗
+              Install <ExternalLink size={12} strokeWidth={2} />
             </button>
             <button
               className="vb-toast-dismiss"
               onClick={() => setVbToastDismissed(true)}
             >
-              ✕
+              <X size={14} strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -261,7 +274,11 @@ export default function App() {
           <div className="vb-toast-content">
             <div className="vb-toast-row">
               <span className="vb-toast-icon">
-                {installState === "error" ? "✕" : "⬡"}
+                {installState === "error" ? (
+                  <AlertCircle size={18} strokeWidth={1.5} />
+                ) : (
+                  <Hexagon size={18} strokeWidth={1.5} />
+                )}
               </span>
               <div className="vb-toast-text">
                 <span className="vb-toast-title">
@@ -286,7 +303,7 @@ export default function App() {
           {installState === "error" && (
             <div className="vb-toast-actions">
               <button className="vb-toast-install" onClick={handleOpenPage}>
-                Open page
+                Open page <ExternalLink size={12} strokeWidth={2} />
               </button>
               <button
                 className="vb-toast-dismiss"
@@ -295,7 +312,7 @@ export default function App() {
                   setVbToastDismissed(false);
                 }}
               >
-                ✕
+                <X size={14} strokeWidth={2} />
               </button>
             </div>
           )}

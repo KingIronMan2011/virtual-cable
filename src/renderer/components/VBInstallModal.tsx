@@ -1,3 +1,5 @@
+import { ExternalLink, Hexagon } from "lucide-react";
+
 interface Props {
   open: boolean;
   onInstall: () => void;
@@ -16,7 +18,9 @@ export default function VBInstallModal({
   return (
     <div className="modal-overlay" onClick={onDismiss}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-icon">⬡</div>
+        <div className="modal-icon">
+          <Hexagon size={32} strokeWidth={1.25} />
+        </div>
         <h2 className="modal-title">VB-Audio not detected</h2>
         <p className="modal-body">
           VB-Audio Virtual Cable creates virtual audio devices visible to all
@@ -33,7 +37,7 @@ export default function VBInstallModal({
             Skip for now
           </button>
           <button className="btn-ghost" onClick={onOpenPage}>
-            Open page ↗
+            Open page <ExternalLink size={13} strokeWidth={2} />
           </button>
           <button className="btn-primary" onClick={onInstall}>
             Auto-install

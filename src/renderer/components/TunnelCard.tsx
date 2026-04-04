@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Power, Trash2, Volume2, VolumeX } from "lucide-react";
 import type { AudioDevice, Tunnel } from "../../types";
 
 interface Props {
@@ -83,7 +84,7 @@ export default function TunnelCard({
           onClick={() => onDelete(tunnel.id)}
           title="Delete cable"
         >
-          ✕
+          <Trash2 size={13} strokeWidth={2} />
         </button>
       </div>
 
@@ -164,7 +165,7 @@ export default function TunnelCard({
           disabled={!canActivate}
           title={!canActivate ? "Select input and output first" : undefined}
         >
-          <span className="toggle-led" />
+          <Power size={12} strokeWidth={2.5} />
           {tunnel.active ? "Live" : "Offline"}
         </button>
         <button
@@ -179,7 +180,11 @@ export default function TunnelCard({
                 : "Mute"
           }
         >
-          {tunnel.muted ? "M" : "M"}
+          {tunnel.muted ? (
+            <VolumeX size={13} strokeWidth={2} />
+          ) : (
+            <Volume2 size={13} strokeWidth={2} />
+          )}
         </button>
       </div>
     </div>
