@@ -20,7 +20,12 @@ const config: ForgeConfig = {
     force: true,
   },
   makers: [
-    new MakerSquirrel({ name: "virtual_cable" }),
+    new MakerSquirrel({
+      name: "virtual_cable",
+      authors: "KingIronMan2011",
+      copyright: "2026 KingIronMan2011",
+      description: "Virtual Audio Cable — route audio between apps",
+    }),
     new MakerZIP({}, ["darwin"]),
     new MakerRpm({}),
     new MakerDeb({}),
