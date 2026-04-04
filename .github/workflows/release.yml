@@ -76,24 +76,14 @@ jobs:
           path: out/make/squirrel.windows/x64/
           if-no-files-found: error
 
-  # ── 2b. Build the macOS zips (arm64 + x64 as separate native builds) ─────────
-  # Building --arch universal with native modules like naudiodon fails because
-  # @electron/universal requires identical mach-o file counts in both sub-packages,
-  # but cross-compiling naudiodon (which links portaudio) produces a different file
-  # structure on arm64 vs x64. Building on native hardware sidesteps all of that.
+  # ── 2b. Build the macOS zip (arm64 / Apple Silicon) ─────────────────────────
+  # Intel macOS runners (macos-13) are being phased out on GitHub Actions.
+  # arm64 covers all Apple Silicon Macs; Intel users can run it via Rosetta 2.
   build-macos:
-    name: Build — macOS (${{ matrix.arch }})
+    name: Build — macOS (arm64)
     needs: prepare
     if: needs.prepare.outputs.should_build == 'true'
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: arm64
-            runner: macos-latest # Apple Silicon runner
-          - arch: x64
-            runner: macos-13 # Intel runner
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v5
@@ -106,14 +96,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Rebuild native addons for ${{ matrix.arch }}
-        run: npx electron-rebuild -f -w naudiodon,segfault-handler --arch ${{ matrix.arch }}
+      - name: Rebuild native addons for arm64
+        run: npx electron-rebuild -f -w naudiodon,segfault-handler --arch arm64
 
       - name: Build icons
         run: npm run build:icons
 
-      - name: Build ${{ matrix.arch }} zip
-        run: npm run make -- --arch ${{ matrix.arch }}
+      - name: Build arm64 zip
+        run: npm run make -- --arch arm64
 
       - name: List build output
         run: find out/make -type f | sort
@@ -121,15 +111,14 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: zip-macos-${{ matrix.arch }}
-          path: out/make/zip/darwin/${{ matrix.arch }}/
+          name: zip-macos
+          path: out/make/zip/darwin/arm64/
           if-no-files-found: error
 
   # ── 3. Publish the GitHub release ─────────────────────────────────────────
   release:
     name: Release
     needs: [prepare, build-windows, build-macos]
-    # build-macos is a matrix job — all matrix entries must succeed
     if: needs.prepare.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
@@ -140,7 +129,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
-          # Collects: squirrel-windows/, zip-macos-arm64/, zip-macos-x64/
 
       - name: List downloaded artifacts
         run: find artifacts -type f | sort
