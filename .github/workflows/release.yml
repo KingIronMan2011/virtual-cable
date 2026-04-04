@@ -36,9 +36,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── 2. Build the Windows installer ────────────────────────────────────────
-  build:
-    name: Build
+  # ── 2a. Build the Windows installer ───────────────────────────────────────
+  build-windows:
+    name: Build — Windows
     needs: prepare
     if: needs.prepare.outputs.should_build == 'true'
     runs-on: windows-latest
@@ -48,7 +48,7 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -80,20 +80,56 @@ jobs:
           path: out/make/squirrel.windows/x64/
           if-no-files-found: error
 
+  # ── 2b. Build the macOS zip ────────────────────────────────────────────────
+  build-macos:
+    name: Build — macOS
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native addons
+        run: npx electron-rebuild -f -w naudiodon
+
+      - name: Build icons
+        run: npm run build:icons
+
+      - name: Build zip
+        run: npm run make
+
+      - name: List build output
+        run: find out/make -type f | sort
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zip-macos
+          path: out/make/zip/darwin/
+          if-no-files-found: error
+
   # ── 3. Publish the GitHub release ─────────────────────────────────────────
   release:
     name: Release
-    needs: [prepare, build]
+    needs: [prepare, build-windows, build-macos]
     if: needs.prepare.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: squirrel-windows
           path: artifacts/
 
       - name: List downloaded artifacts
@@ -101,7 +137,7 @@ jobs:
 
       - name: Create GitHub release
         run: |
-          mapfile -t FILES < <(find artifacts -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" \))
+          mapfile -t FILES < <(find artifacts -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" -o -name "*.zip" \))
           echo "Uploading: ${FILES[*]}"
           gh release create "v${{ needs.prepare.outputs.version }}" \
             --title "v${{ needs.prepare.outputs.version }}" \
