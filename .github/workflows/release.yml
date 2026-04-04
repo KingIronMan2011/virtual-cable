@@ -49,10 +49,43 @@ jobs:
 
   # ── 2. Build on each platform and upload assets ───────────────────────────
   build-mac:
-    name: Build — MacOS
+    name: Build — macOS
     needs: prepare
     if: needs.prepare.outputs.should_build == 'true'
     runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild native addons
+        run: npx electron-rebuild -f -w naudiodon
+
+      - name: Build
+        run: npm run make
+
+      - name: List output (debug)
+        run: find out/make -type f | sort
+
+      - name: Upload assets
+        run: |
+          gh release upload "v${{ needs.prepare.outputs.version }}" \
+            $(find out/make/zip/darwin -name "*.zip") \
+            --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-win:
+    name: Build — Windows
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -74,48 +107,15 @@ jobs:
       - name: Build
         run: npm run make
 
+      - name: List output (debug)
+        shell: bash
+        run: find out/make -type f | sort
+
       - name: Upload assets
-        if: runner.os == 'macOS'
-        run: |
-          gh release upload "v${{ needs.prepare.outputs.version }}" \
-            $(find out/make/zip/darwin -name "*.zip") \
-            --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-win:
-    name: Build — Windows
-    needs: prepare
-    if: needs.prepare.outputs.should_build == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-        env:
-          npm_config_msvs_version: "2022"
-
-      - name: Rebuild native addons
-        run: npx electron-rebuild -f -w naudiodon
-        env:
-          npm_config_msvs_version: "2022"
-
-      - name: Build installer
-        run: npm run make
-
-      - name: Create GitHub release
         shell: bash
         run: |
-          gh release create "v${{ needs.prepare.outputs.version }}" \
-            out/make/squirrel.windows/x64/*.exe \
-            out/make/squirrel.windows/x64/*.nupkg \
-            out/make/squirrel.windows/x64/RELEASES
+          mapfile -t FILES < <(find out/make/squirrel.windows -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" \))
+          gh release upload "v${{ needs.prepare.outputs.version }}" "${FILES[@]}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
