@@ -3,140 +3,63 @@ name: Release
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  # ── 1. Check version and create a draft release ───────────────────────────
-  prepare:
-    name: Prepare release
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      should_build: ${{ steps.check.outputs.should_build }}
+  release:
+    name: Build & Release
+    runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
       - name: Get version from package.json
         id: version
+        shell: bash
         run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
 
       - name: Check if release already exists
         id: check
+        shell: bash
         run: |
           if gh release view "v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
-            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "exists=true" >> $GITHUB_OUTPUT
             echo "Release v${{ steps.version.outputs.version }} already exists — skipping."
           else
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "Release v${{ steps.version.outputs.version }} not found — will build."
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release v${{ steps.version.outputs.version }} not found — will build and publish."
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create draft release
-        if: steps.check.outputs.should_build == 'true'
+      - name: Install dependencies
+        if: steps.check.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Build icons
+        if: steps.check.outputs.exists == 'false'
+        run: npm run build:icons
+
+      - name: Build installer
+        if: steps.check.outputs.exists == 'false'
+        run: npm run make
+
+      - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
+        shell: bash
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "v${{ steps.version.outputs.version }}" \
             --generate-notes \
-            --draft
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ── 2. Build on each platform and upload assets ───────────────────────────
-  build-mac:
-    name: Build — macOS
-    needs: prepare
-    if: needs.prepare.outputs.should_build == 'true'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Rebuild native addons
-        run: npx electron-rebuild -f -w naudiodon
-
-      - name: Build icons
-        run: npm run build:icons
-
-      - name: Build
-        run: npm run make
-
-      - name: List output (debug)
-        run: find out/make -type f | sort
-
-      - name: Upload assets
-        run: |
-          gh release upload "v${{ needs.prepare.outputs.version }}" \
-            $(find out/make/zip/darwin -name "*.zip") \
-            --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-win:
-    name: Build — Windows
-    needs: prepare
-    if: needs.prepare.outputs.should_build == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-        env:
-          npm_config_msvs_version: "2022"
-
-      - name: Rebuild native addons
-        run: npx electron-rebuild -f -w naudiodon
-        env:
-          npm_config_msvs_version: "2022"
-
-      - name: Build icons
-        run: npm run build:icons
-
-      - name: Build
-        run: npm run make
-
-      - name: List output (debug)
-        shell: bash
-        run: find out/make -type f | sort
-
-      - name: Upload assets
-        shell: bash
-        run: |
-          mapfile -t FILES < <(find out/make/squirrel.windows -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" \))
-          gh release upload "v${{ needs.prepare.outputs.version }}" "${FILES[@]}" --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ── 3. Publish once all platform builds have uploaded ─────────────────────
-  publish:
-    name: Publish release
-    needs: [prepare, build-win, build-mac]
-    if: needs.prepare.outputs.should_build == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Publish release
-        run: |
-          gh release edit "v${{ needs.prepare.outputs.version }}" --draft=false
+            out/make/squirrel.windows/x64/*.exe \
+            out/make/squirrel.windows/x64/*.nupkg \
+            out/make/squirrel.windows/x64/RELEASES
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
