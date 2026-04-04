@@ -69,16 +69,22 @@ jobs:
         env:
           npm_config_msvs_version: "2022"
 
+      - name: List build output
+        shell: bash
+        run: find out/make -type f | sort
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: squirrel-windows
           path: out/make/squirrel.windows/x64/
+          if-no-files-found: error
 
   # ── 3. Publish the GitHub release ─────────────────────────────────────────
   release:
     name: Release
     needs: [prepare, build]
+    if: needs.prepare.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -90,13 +96,16 @@ jobs:
           name: squirrel-windows
           path: artifacts/
 
+      - name: List downloaded artifacts
+        run: find artifacts -type f | sort
+
       - name: Create GitHub release
         run: |
+          mapfile -t FILES < <(find artifacts -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" \))
+          echo "Uploading: ${FILES[*]}"
           gh release create "v${{ needs.prepare.outputs.version }}" \
             --title "v${{ needs.prepare.outputs.version }}" \
             --generate-notes \
-            artifacts/*.exe \
-            artifacts/*.nupkg \
-            artifacts/RELEASES
+            "${FILES[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
