@@ -91,9 +91,9 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            runner: macos-latest   # Apple Silicon runner
+            runner: macos-latest # Apple Silicon runner
           - arch: x64
-            runner: macos-13       # Intel runner
+            runner: macos-13 # Intel runner
 
     steps:
       - uses: actions/checkout@v5

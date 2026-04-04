@@ -18,7 +18,7 @@ import { cp, mkdir } from "node:fs/promises";
 const NATIVE_MODULES = [
   "naudiodon",
   "segfault-handler",
-  "bindings",        // naudiodon's native-loader dep
+  "bindings", // naudiodon's native-loader dep
   "file-uri-to-path", // bindings' dep
 ];
 

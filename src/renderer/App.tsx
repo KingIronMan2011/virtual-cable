@@ -240,7 +240,9 @@ export default function App() {
         <div className="vb-toast">
           <div className="vb-toast-content">
             <div className="vb-toast-row">
-              <span className="vb-toast-icon"><Hexagon size={18} strokeWidth={1.5} /></span>
+              <span className="vb-toast-icon">
+                <Hexagon size={18} strokeWidth={1.5} />
+              </span>
               <div className="vb-toast-text">
                 <span className="vb-toast-title">VB-Audio not detected</span>
                 <span className="vb-toast-sub">
