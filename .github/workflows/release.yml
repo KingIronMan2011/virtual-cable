@@ -67,6 +67,9 @@ jobs:
       - name: Rebuild native addons
         run: npx electron-rebuild -f -w naudiodon
 
+      - name: Build icons
+        run: npm run build:icons
+
       - name: Build
         run: npm run make
 
@@ -103,6 +106,9 @@ jobs:
         run: npx electron-rebuild -f -w naudiodon
         env:
           npm_config_msvs_version: "2022"
+
+      - name: Build icons
+        run: npm run build:icons
 
       - name: Build
         run: npm run make

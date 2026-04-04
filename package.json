@@ -12,6 +12,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "postinstall": "electron-rebuild -f -w naudiodon",
+    "build:icons": "node scripts/build-icons.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src"
@@ -36,7 +37,9 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "png-to-ico": "^3.0.1",
     "prettier": "^3.8.1",
+    "sharp": "^0.34.5",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.3"
