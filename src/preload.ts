@@ -56,4 +56,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update:status", listener);
     return () => ipcRenderer.removeListener("update:status", listener);
   },
+
+  getTunnelSampleRate: (id: string): Promise<number | null> =>
+    ipcRenderer.invoke("audio:getTunnelSampleRate", id),
+
+  setTunnelMuted: (id: string, muted: boolean): Promise<void> =>
+    ipcRenderer.invoke("audio:setTunnelMuted", id, muted),
+
+  onAudioLevel: (
+    cb: (tunnelId: string, level: number) => void,
+  ): (() => void) => {
+    const listener = (_: unknown, tunnelId: string, level: number) =>
+      cb(tunnelId, level);
+    ipcRenderer.on("audio:level", listener);
+    return () => ipcRenderer.removeListener("audio:level", listener);
+  },
 });

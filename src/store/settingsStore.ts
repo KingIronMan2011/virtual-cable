@@ -1,13 +1,17 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { app } from "electron";
+import type { AppSettings } from "../types";
 
-export interface AppSettings {
-  autoUpdate: boolean;
-}
+export type { AppSettings };
 
 const DEFAULTS: AppSettings = {
   autoUpdate: false,
+  minimizeToTray: false,
+  experimentalFeatures: false,
+  expLatency: false,
+  bufferSize: 512,
+  expSampleRate: false,
 };
 
 function storePath(): string {

@@ -1,20 +1,22 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { AudioDevice, Tunnel } from "../types";
+import type { AudioDevice, Tunnel, InstallState, AppSettings } from "../types";
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
 import SettingsPanel from "./components/SettingsPanel";
 
-type InstallState =
-  | "idle"
-  | "downloading"
-  | "extracting"
-  | "launching"
-  | "done"
-  | "error";
+const SETTINGS_DEFAULTS: AppSettings = {
+  autoUpdate: false,
+  minimizeToTray: false,
+  experimentalFeatures: false,
+  expLatency: false,
+  bufferSize: 512,
+  expSampleRate: false,
+};
 
 export default function App() {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
   const [vbModalOpen, setVbModalOpen] = useState(false);
   const [vbToastDismissed, setVbToastDismissed] = useState(false);
@@ -29,10 +31,12 @@ export default function App() {
       window.electronAPI.getDevices(),
       window.electronAPI.loadTunnels(),
       window.electronAPI.checkVBAudioInstalled(),
-    ]).then(([devs, saved, installed]) => {
+      window.electronAPI.loadSettings(),
+    ]).then(([devs, saved, installed, s]) => {
       setDevices(devs);
       setTunnels(saved);
       setVbInstalled(installed);
+      setSettings(s);
       loaded.current = true;
     });
   }, []);
@@ -53,6 +57,7 @@ export default function App() {
           inputDeviceId: null,
           outputDeviceId: null,
           active: false,
+          muted: false,
         },
       ];
     });
@@ -64,17 +69,27 @@ export default function App() {
   }, []);
 
   const updateTunnel = useCallback(async (updated: Tunnel) => {
-    setTunnels((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    let prev: Tunnel | undefined;
+    setTunnels((ts) => {
+      prev = ts.find((t) => t.id === updated.id);
+      return ts.map((t) => (t.id === updated.id ? updated : t));
+    });
+
     if (
       updated.active &&
       updated.inputDeviceId !== null &&
       updated.outputDeviceId !== null
     ) {
-      await window.electronAPI.createTunnel(
-        updated.id,
-        updated.inputDeviceId,
-        updated.outputDeviceId,
-      );
+      // Only (re)create the stream when going from inactive → active
+      if (!prev?.active) {
+        await window.electronAPI.createTunnel(
+          updated.id,
+          updated.inputDeviceId,
+          updated.outputDeviceId,
+        );
+      }
+      // Apply mute state whenever the tunnel is active (handles mute toggle on live tunnel)
+      await window.electronAPI.setTunnelMuted(updated.id, updated.muted);
     } else {
       await window.electronAPI.destroyTunnel(updated.id);
     }
@@ -110,6 +125,23 @@ export default function App() {
     await window.electronAPI.installVBAudio();
     setVbModalOpen(false);
   }, []);
+
+  const rescanDevices = useCallback(async () => {
+    const [devs, installed] = await Promise.all([
+      window.electronAPI.getDevices(),
+      window.electronAPI.checkVBAudioInstalled(),
+    ]);
+    setDevices(devs);
+    setVbInstalled(installed);
+    if (installed) setVbToastDismissed(false);
+  }, []);
+
+  // Auto-rescan when the window regains focus so newly installed
+  // VB-Audio devices appear without a manual rescan or restart
+  useEffect(() => {
+    window.addEventListener("focus", rescanDevices);
+    return () => window.removeEventListener("focus", rescanDevices);
+  }, [rescanDevices]);
 
   const activeCableCount = tunnels.filter((t) => t.active).length;
 
@@ -148,11 +180,17 @@ export default function App() {
             </span>
             <span className="meta-label">live</span>
           </div>
-          {vbInstalled === true && (
-            <>
-              <div className="meta-divider" />
-              <span className="meta-vb-ok">VB-Audio</span>
-            </>
+          <div className="meta-divider" />
+          {vbInstalled === true ? (
+            <span className="meta-vb-ok">VB-Audio ✓</span>
+          ) : (
+            <button
+              className="header-rescan-btn"
+              onClick={rescanDevices}
+              title="Re-scan audio devices"
+            >
+              ↺
+            </button>
           )}
           <div className="meta-divider" />
           <button
@@ -172,6 +210,9 @@ export default function App() {
             devices={devices}
             onUpdate={updateTunnel}
             onDelete={deleteTunnel}
+            expSampleRate={
+              settings.experimentalFeatures && settings.expSampleRate
+            }
           />
         </div>
       </main>
@@ -263,7 +304,10 @@ export default function App() {
 
       <SettingsPanel
         open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        onClose={() => {
+          setSettingsOpen(false);
+          window.electronAPI.loadSettings().then(setSettings);
+        }}
       />
 
       <VBInstallModal

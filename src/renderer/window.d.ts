@@ -24,6 +24,9 @@ declare global {
       installUpdate(): Promise<void>;
       getUpdateState(): Promise<UpdateState>;
       onUpdateStatus(cb: (state: UpdateState) => void): () => void;
+      getTunnelSampleRate(id: string): Promise<number | null>;
+      setTunnelMuted(id: string, muted: boolean): Promise<void>;
+      onAudioLevel(cb: (tunnelId: string, level: number) => void): () => void;
     };
   }
 }

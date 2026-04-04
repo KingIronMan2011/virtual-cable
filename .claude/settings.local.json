@@ -19,7 +19,10 @@
       "Bash(npm run:*)",
       "Bash(npm list:*)",
       "Bash(npm audit:*)",
-      "Bash(npm show:*)"
+      "Bash(npm show:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/electron-rebuild --version)",
+      "Bash(node_modules/.bin/electron-rebuild -f -w segfault-handler -v 41.1.1)"
     ]
   }
 }

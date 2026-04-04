@@ -52,12 +52,8 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        # postinstall runs electron-rebuild for naudiodon + segfault-handler
         run: npm ci
-        env:
-          npm_config_msvs_version: "2022"
-
-      - name: Rebuild native addons
-        run: npx electron-rebuild -f -w naudiodon
         env:
           npm_config_msvs_version: "2022"
 
@@ -98,14 +94,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Rebuild native addons
-        run: npx electron-rebuild -f -w naudiodon
+      - name: Rebuild native addons (arm64 + x64 for universal)
+        run: |
+          npx electron-rebuild -f -w naudiodon,segfault-handler --arch arm64
+          npx electron-rebuild -f -w naudiodon,segfault-handler --arch x64
 
       - name: Build icons
         run: npm run build:icons
 
-      - name: Build zip
-        run: npm run make
+      - name: Build universal zip
+        run: npm run make -- --arch universal
 
       - name: List build output
         run: find out/make -type f | sort

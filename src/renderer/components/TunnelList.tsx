@@ -6,6 +6,7 @@ interface Props {
   devices: AudioDevice[];
   onUpdate: (tunnel: Tunnel) => void;
   onDelete: (id: string) => void;
+  expSampleRate: boolean;
 }
 
 export default function TunnelList({
@@ -13,6 +14,7 @@ export default function TunnelList({
   devices,
   onUpdate,
   onDelete,
+  expSampleRate,
 }: Props) {
   if (tunnels.length === 0) {
     return (
@@ -36,6 +38,7 @@ export default function TunnelList({
           devices={devices}
           onUpdate={onUpdate}
           onDelete={onDelete}
+          expSampleRate={expSampleRate}
         />
       ))}
     </>

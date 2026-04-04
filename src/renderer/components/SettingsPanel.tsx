@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import packageJson from "../../../package.json";
 import type { UpdateState } from "../../updater/updater";
-import type { AppSettings } from "../../store/settingsStore";
+import type { AppSettings, BufferSize } from "../../types";
 
 interface Props {
   open: boolean;
@@ -28,8 +28,21 @@ const STATUS_CLASS: Record<UpdateState["status"], string> = {
   error: "update-status--error",
 };
 
+const BUFFER_OPTIONS: { value: BufferSize; label: string; sub: string }[] = [
+  { value: 256, label: "Low", sub: "~5 ms" },
+  { value: 512, label: "Medium", sub: "~10 ms" },
+  { value: 1024, label: "High", sub: "~21 ms" },
+];
+
 export default function SettingsPanel({ open, onClose }: Props) {
-  const [settings, setSettings] = useState<AppSettings>({ autoUpdate: false });
+  const [settings, setSettings] = useState<AppSettings>({
+    autoUpdate: false,
+    minimizeToTray: false,
+    experimentalFeatures: false,
+    expLatency: false,
+    bufferSize: 512,
+    expSampleRate: false,
+  });
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: "idle",
   });
@@ -47,9 +60,9 @@ export default function SettingsPanel({ open, onClose }: Props) {
     return unsub;
   }, []);
 
-  const setAutoUpdate = useCallback(
-    async (enabled: boolean) => {
-      const next = { ...settings, autoUpdate: enabled };
+  const setSetting = useCallback(
+    async (patch: Partial<typeof settings>) => {
+      const next = { ...settings, ...patch };
       setSettings(next);
       await window.electronAPI.saveSettings(next);
     },
@@ -110,6 +123,123 @@ export default function SettingsPanel({ open, onClose }: Props) {
                 </span>
               </div>
             </div>
+          </section>
+
+          {/* ── Behaviour ── */}
+          <section className="settings-section">
+            <span className="settings-section-title">Behaviour</span>
+
+            <div className="settings-toggle-row">
+              <div className="settings-toggle-text">
+                <span className="settings-toggle-label">Minimize to tray</span>
+                <span className="settings-toggle-sub">
+                  Closing the window keeps cables running in the background
+                </span>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.minimizeToTray}
+                  onChange={(e) =>
+                    setSetting({ minimizeToTray: e.target.checked })
+                  }
+                />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+          </section>
+
+          {/* ── Experimental ── */}
+          <section className="settings-section">
+            <span className="settings-section-title">Experimental</span>
+
+            <div className="settings-toggle-row">
+              <div className="settings-toggle-text">
+                <span className="settings-toggle-label">
+                  Experimental features
+                </span>
+                <span className="settings-toggle-sub">
+                  Enable in-progress features. May cause instability.
+                </span>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.experimentalFeatures}
+                  onChange={(e) =>
+                    setSetting({ experimentalFeatures: e.target.checked })
+                  }
+                />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+
+            {settings.experimentalFeatures && (
+              <div className="experimental-features">
+                {/* ── Custom latency ── */}
+                <div className="exp-feature">
+                  <div className="settings-toggle-row exp-feature-toggle">
+                    <div className="settings-toggle-text">
+                      <span className="settings-toggle-label">
+                        Custom latency
+                      </span>
+                      <span className="settings-toggle-sub">
+                        Override PortAudio buffer size. Active cables restart
+                        when changed.
+                      </span>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.expLatency}
+                        onChange={(e) =>
+                          setSetting({ expLatency: e.target.checked })
+                        }
+                      />
+                      <span className="toggle-slider" />
+                    </label>
+                  </div>
+                  {settings.expLatency && (
+                    <div className="latency-picker">
+                      {BUFFER_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          className={`latency-btn${settings.bufferSize === opt.value ? " is-active" : ""}`}
+                          onClick={() => setSetting({ bufferSize: opt.value })}
+                        >
+                          <span className="latency-btn-label">{opt.label}</span>
+                          <span className="latency-btn-sub">{opt.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Sample rate display ── */}
+                <div className="exp-feature">
+                  <div className="settings-toggle-row exp-feature-toggle">
+                    <div className="settings-toggle-text">
+                      <span className="settings-toggle-label">
+                        Sample rate display
+                      </span>
+                      <span className="settings-toggle-sub">
+                        Show the negotiated sample rate on each active cable.
+                      </span>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.expSampleRate}
+                        onChange={(e) =>
+                          setSetting({ expSampleRate: e.target.checked })
+                        }
+                      />
+                      <span className="toggle-slider" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* ── Updates ── */}
@@ -173,7 +303,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
                 <input
                   type="checkbox"
                   checked={settings.autoUpdate}
-                  onChange={(e) => setAutoUpdate(e.target.checked)}
+                  onChange={(e) => setSetting({ autoUpdate: e.target.checked })}
                 />
                 <span className="toggle-slider" />
               </label>

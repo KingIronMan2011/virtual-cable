@@ -50,10 +50,9 @@ export async function openInstallPage(): Promise<void> {
   await shell.openExternal("https://www.vb-audio.com/Cable/");
 }
 
-export type ProgressCallback = (
-  stage: "downloading" | "extracting" | "launching",
-  pct?: number,
-) => void;
+import type { ProgressCallback } from "../types";
+
+export type { ProgressCallback };
 
 /**
  * Downloads the VB-Audio Cable zip, extracts it to a temp directory,

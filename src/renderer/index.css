@@ -173,13 +173,8 @@ body::after {
   letter-spacing: 0.06em;
 }
 
-.meta-vb-ok::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-active);
-  box-shadow: 0 0 5px var(--color-active);
+.meta-vb-ok {
+  color: var(--color-active) !important;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -276,7 +271,8 @@ body::after {
   display: grid;
   grid-template-columns: 1fr 88px 1fr;
   align-items: center;
-  gap: 10px;
+  column-gap: 10px;
+  row-gap: 4px;
   margin-bottom: 14px;
 }
 
@@ -400,11 +396,49 @@ body::after {
 }
 
 /* ─────────────────────────────────────────────────────────────────
+   VU Meter
+───────────────────────────────────────────────────────────────── */
+.card-sample-rate {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.vu-meter {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255 255 255 / 0.06);
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+
+.vu-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #22c55e 0%,
+    #84cc16 45%,
+    #eab308 70%,
+    #f97316 85%,
+    #ef4444 100%
+  );
+  transition: width 60ms linear;
+  will-change: width;
+}
+
+/* ─────────────────────────────────────────────────────────────────
    Toggle Button
 ───────────────────────────────────────────────────────────────── */
 .card-foot {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
   padding-top: 2px;
 }
 
@@ -462,6 +496,49 @@ body::after {
   box-shadow:
     0 0 5px var(--color-active),
     0 0 2px var(--color-active);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Mute Button
+───────────────────────────────────────────────────────────────── */
+.cable-mute {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  border-radius: 100px;
+  border: 1px solid var(--color-border-hi);
+  color: var(--color-border-hi);
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+.cable-mute:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+.cable-mute:not(:disabled):not(.is-muted):hover {
+  border-color: var(--color-muted);
+  color: var(--color-muted);
+}
+
+.cable-mute.is-muted {
+  border-color: #e8a838;
+  color: #e8a838;
+  background: color-mix(in srgb, #e8a838 10%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, #e8a838 20%, transparent);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -785,6 +862,21 @@ body::after {
 /* ─────────────────────────────────────────────────────────────────
    Header settings button
 ───────────────────────────────────────────────────────────────── */
+.header-rescan-btn {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.header-rescan-btn:hover {
+  color: var(--color-accent);
+}
+
 .header-settings-btn {
   background: none;
   border: none;
@@ -962,6 +1054,83 @@ body::after {
   border: 1px solid var(--color-border-hi);
   color: var(--color-muted);
 }
+.experimental-features {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.exp-feature {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.exp-feature:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.exp-feature-toggle {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.latency-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.latency-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.latency-btn:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+
+.latency-btn.is-active {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border-color: var(--color-accent);
+}
+
+.latency-btn-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.latency-btn.is-active .latency-btn-label {
+  color: var(--color-accent);
+}
+
+.latency-btn-sub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--color-muted);
+}
+
 .update-status--checking {
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);

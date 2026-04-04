@@ -1,18 +1,7 @@
 import { autoUpdater, BrowserWindow, app } from "electron";
+import type { UpdateStatus, UpdateState } from "../types";
 
-export type UpdateStatus =
-  | "idle"
-  | "checking"
-  | "available"
-  | "not-available"
-  | "ready"
-  | "error";
-
-export interface UpdateState {
-  status: UpdateStatus;
-  version?: string;
-  error?: string;
-}
+export type { UpdateStatus, UpdateState };
 
 let state: UpdateState = { status: "idle" };
 let win: BrowserWindow | null = null;
