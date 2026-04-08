@@ -1,10 +1,8 @@
 import {
   Cable,
   Download,
-  Github,
   Power,
   Volume2,
-  VolumeX,
   Layers,
   Activity,
   MonitorSpeaker,
@@ -12,8 +10,9 @@ import {
   Zap,
   Shield,
 } from "lucide-react";
+import { LuGithub } from "react-icons/lu";
 
-const GITHUB_URL = "https://github.com/JulianSpeckmann/virtual-cable";
+const GITHUB_URL = "https://github.com/KingIronMan2011/virtual-cable";
 const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -33,7 +32,7 @@ function Header() {
             rel="noreferrer"
             className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors"
           >
-            <Github size={15} />
+            <LuGithub size={15} />
             GitHub
           </a>
           <a
@@ -122,7 +121,7 @@ function Hero() {
             rel="noreferrer"
             className="flex items-center gap-2 text-zinc-300 hover:text-white border border-surface-border hover:border-zinc-600 px-5 py-2.5 rounded-lg transition-colors"
           >
-            <Github size={16} />
+            <LuGithub size={16} />
             View source
           </a>
         </div>
@@ -302,7 +301,7 @@ function Footer() {
             rel="noreferrer"
             className="flex items-center gap-1.5 hover:text-zinc-400 transition-colors"
           >
-            <Github size={14} />
+            <LuGithub size={14} />
             GitHub
           </a>
           <a
