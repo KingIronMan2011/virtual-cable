@@ -59,7 +59,9 @@ export function listAudioApps(): AudioApp[] {
 export class AppCaptureReadable extends Readable {
   private readonly pid: number;
   private readonly outputChannels: number;
-  private native: ReturnType<NativeAddon["AppCaptureStream"]["prototype"]["constructor"]> | null = null;
+  private native: ReturnType<
+    NativeAddon["AppCaptureStream"]["prototype"]["constructor"]
+  > | null = null;
   private started = false;
 
   constructor(pid: number, channels = 2) {
@@ -89,7 +91,10 @@ export class AppCaptureReadable extends Readable {
         }
       }, this.outputChannels);
     } catch (err) {
-      console.error(`[app-capture] failed to start capture for PID ${this.pid}:`, err);
+      console.error(
+        `[app-capture] failed to start capture for PID ${this.pid}:`,
+        err,
+      );
     }
   }
 
@@ -99,7 +104,9 @@ export class AppCaptureReadable extends Readable {
     this.started = false;
     try {
       this.native?.stop();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     this.native = null;
     this.push(null); // signal end-of-stream
   }

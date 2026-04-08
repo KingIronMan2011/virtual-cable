@@ -9,7 +9,12 @@ declare global {
       getAudioApps(): Promise<{ pid: number; name: string; exe: string }[]>;
       createTunnel(
         id: string,
-        inputs: { deviceId: number; appPid?: number; gain: number; priority: boolean }[],
+        inputs: {
+          deviceId: number;
+          appPid?: number;
+          gain: number;
+          priority: boolean;
+        }[],
         outputId: number,
         channelCount: number | null,
         ducking: { enabled: boolean; amount: number; release: number },
@@ -33,8 +38,16 @@ declare global {
       getTunnelChannelCount(id: string): Promise<number | null>;
       setTunnelMuted(id: string, muted: boolean): Promise<void>;
       setTunnelGain(id: string, gain: number): Promise<void>;
-      setTunnelInputGain(id: string, inputIndex: number, gain: number): Promise<void>;
-      setTunnelInputPriority(id: string, inputIndex: number, priority: boolean): Promise<void>;
+      setTunnelInputGain(
+        id: string,
+        inputIndex: number,
+        gain: number,
+      ): Promise<void>;
+      setTunnelInputPriority(
+        id: string,
+        inputIndex: number,
+        priority: boolean,
+      ): Promise<void>;
       setTunnelDucking(
         id: string,
         ducking: { enabled: boolean; amount: number; release: number },

@@ -12,10 +12,18 @@ function getHwid(): string {
   const mac =
     Object.values(os.networkInterfaces())
       .flat()
-      .find((iface) => iface && !iface.internal && iface.mac !== "00:00:00:00:00:00")
-      ?.mac ?? "";
+      .find(
+        (iface) =>
+          iface && !iface.internal && iface.mac !== "00:00:00:00:00:00",
+      )?.mac ?? "";
 
-  const raw = [os.hostname(), os.platform(), os.arch(), os.cpus()[0]?.model ?? "", mac].join("|");
+  const raw = [
+    os.hostname(),
+    os.platform(),
+    os.arch(),
+    os.cpus()[0]?.model ?? "",
+    mac,
+  ].join("|");
 
   cachedHwid = createHash("sha256").update(raw).digest("hex");
   return cachedHwid;

@@ -11,8 +11,17 @@ interface Props {
   onToggleMute: (id: string) => void;
   onSetGain: (id: string, gain: number) => void;
   onSetInputGain: (id: string, inputIndex: number, gain: number) => void;
-  onSetInputPriority: (id: string, inputIndex: number, priority: boolean) => void;
-  onSetDucking: (id: string, enabled: boolean, amount: number, release: number) => void;
+  onSetInputPriority: (
+    id: string,
+    inputIndex: number,
+    priority: boolean,
+  ) => void;
+  onSetDucking: (
+    id: string,
+    enabled: boolean,
+    amount: number,
+    release: number,
+  ) => void;
   onRename: (id: string, name: string) => void;
   onReorder: (from: number, to: number) => void;
   onDelete: (id: string) => void;

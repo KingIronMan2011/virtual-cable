@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { AppWindow, GripVertical, Plus, Power, Star, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import {
+  AppWindow,
+  GripVertical,
+  Plus,
+  Power,
+  Star,
+  Trash2,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import type { AudioDevice, Tunnel, TunnelInput } from "../../types";
 
 interface Props {
@@ -11,8 +21,17 @@ interface Props {
   onToggleMute: (id: string) => void;
   onSetGain: (id: string, gain: number) => void;
   onSetInputGain: (id: string, inputIndex: number, gain: number) => void;
-  onSetInputPriority: (id: string, inputIndex: number, priority: boolean) => void;
-  onSetDucking: (id: string, enabled: boolean, amount: number, release: number) => void;
+  onSetInputPriority: (
+    id: string,
+    inputIndex: number,
+    priority: boolean,
+  ) => void;
+  onSetDucking: (
+    id: string,
+    enabled: boolean,
+    amount: number,
+    release: number,
+  ) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   expSampleRate: boolean;
@@ -39,7 +58,9 @@ export default function TunnelCard({
   // Cable can activate when every input slot has either a device or an app selected
   const canActivate =
     tunnel.inputs.length > 0 &&
-    tunnel.inputs.every((inp) => inp.deviceId !== null || inp.appPid !== null) &&
+    tunnel.inputs.every(
+      (inp) => inp.deviceId !== null || inp.appPid !== null,
+    ) &&
     tunnel.outputDeviceId !== null;
 
   // Channel count: limited by primary input + output capabilities
@@ -47,13 +68,18 @@ export default function TunnelCard({
   const selectedOutput = devices.find((d) => d.id === tunnel.outputDeviceId);
   const maxChannels =
     primaryInput && selectedOutput
-      ? Math.min(primaryInput.maxInputChannels, selectedOutput.maxOutputChannels)
+      ? Math.min(
+          primaryInput.maxInputChannels,
+          selectedOutput.maxOutputChannels,
+        )
       : 8;
   const channelOptions = [1, 2, 4, 6, 8].filter((n) => n <= maxChannels);
 
   const vuBarRef = useRef<HTMLDivElement>(null);
   const [sampleRate, setSampleRate] = useState<number | null>(null);
-  const [activeChannelCount, setActiveChannelCount] = useState<number | null>(null);
+  const [activeChannelCount, setActiveChannelCount] = useState<number | null>(
+    null,
+  );
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(tunnel.name);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -82,7 +108,9 @@ export default function TunnelCard({
     if (expSampleRate) {
       window.electronAPI.getTunnelSampleRate(tunnel.id).then(setSampleRate);
     }
-    window.electronAPI.getTunnelChannelCount(tunnel.id).then(setActiveChannelCount);
+    window.electronAPI
+      .getTunnelChannelCount(tunnel.id)
+      .then(setActiveChannelCount);
   }, [tunnel.active, tunnel.id, expSampleRate]);
 
   // Auto-focus the name input when entering edit mode
@@ -135,7 +163,10 @@ export default function TunnelCard({
   const addInput = () => {
     onUpdate({
       ...tunnel,
-      inputs: [...tunnel.inputs, { deviceId: null, appPid: null, gain: 1, priority: false }],
+      inputs: [
+        ...tunnel.inputs,
+        { deviceId: null, appPid: null, gain: 1, priority: false },
+      ],
       active: false,
     });
   };
@@ -192,7 +223,10 @@ export default function TunnelCard({
         ) : (
           <span
             className="card-name"
-            onClick={() => { setEditName(tunnel.name); setEditing(true); }}
+            onClick={() => {
+              setEditName(tunnel.name);
+              setEditing(true);
+            }}
             title="Click to rename"
           >
             {tunnel.name}
@@ -259,15 +293,27 @@ export default function TunnelCard({
                   onDoubleClick={() => onSetInputGain(tunnel.id, i, 1)}
                   title="Per-input gain (double-click to reset)"
                 />
-                <span className={`input-gain-db${inp.gain !== 1 ? " is-adjusted" : ""}`}>
+                <span
+                  className={`input-gain-db${inp.gain !== 1 ? " is-adjusted" : ""}`}
+                >
                   {inpGainDb}
                 </span>
                 <button
                   className={`input-priority-btn${inp.priority ? " is-active" : ""}`}
-                  onClick={() => onSetInputPriority(tunnel.id, i, !inp.priority)}
-                  title={inp.priority ? "Priority (click to unset)" : "Set as priority input"}
+                  onClick={() =>
+                    onSetInputPriority(tunnel.id, i, !inp.priority)
+                  }
+                  title={
+                    inp.priority
+                      ? "Priority (click to unset)"
+                      : "Set as priority input"
+                  }
                 >
-                  <Star size={10} strokeWidth={inp.priority ? 0 : 1.5} fill={inp.priority ? "currentColor" : "none"} />
+                  <Star
+                    size={10}
+                    strokeWidth={inp.priority ? 0 : 1.5}
+                    fill={inp.priority ? "currentColor" : "none"}
+                  />
                 </button>
                 {tunnel.inputs.length > 1 && (
                   <button
@@ -334,7 +380,10 @@ export default function TunnelCard({
             className={`channel-btn${tunnel.channelCount === null ? " is-active" : ""}`}
             onClick={() => set({ channelCount: null })}
           >
-            Auto{tunnel.active && activeChannelCount !== null && tunnel.channelCount === null
+            Auto
+            {tunnel.active &&
+            activeChannelCount !== null &&
+            tunnel.channelCount === null
               ? ` (${activeChannelCount})`
               : ""}
           </button>
@@ -357,7 +406,12 @@ export default function TunnelCard({
           <button
             className={`ducking-toggle${tunnel.duckingEnabled ? " is-active" : ""}`}
             onClick={() =>
-              onSetDucking(tunnel.id, !tunnel.duckingEnabled, tunnel.duckingAmount, tunnel.duckingRelease)
+              onSetDucking(
+                tunnel.id,
+                !tunnel.duckingEnabled,
+                tunnel.duckingAmount,
+                tunnel.duckingRelease,
+              )
             }
           >
             {tunnel.duckingEnabled ? "On" : "Off"}
@@ -373,10 +427,20 @@ export default function TunnelCard({
                 step={1}
                 value={Math.round(tunnel.duckingAmount * 100)}
                 onChange={(e) =>
-                  onSetDucking(tunnel.id, tunnel.duckingEnabled, Number(e.target.value) / 100, tunnel.duckingRelease)
+                  onSetDucking(
+                    tunnel.id,
+                    tunnel.duckingEnabled,
+                    Number(e.target.value) / 100,
+                    tunnel.duckingRelease,
+                  )
                 }
                 onDoubleClick={() =>
-                  onSetDucking(tunnel.id, tunnel.duckingEnabled, 0.15, tunnel.duckingRelease)
+                  onSetDucking(
+                    tunnel.id,
+                    tunnel.duckingEnabled,
+                    0.15,
+                    tunnel.duckingRelease,
+                  )
                 }
                 title="How much non-priority inputs are reduced (double-click to reset)"
               />
@@ -395,11 +459,18 @@ export default function TunnelCard({
                 step={50}
                 value={tunnel.duckingRelease}
                 onChange={(e) =>
-                  onSetDucking(tunnel.id, tunnel.duckingEnabled, tunnel.duckingAmount, Number(e.target.value))
+                  onSetDucking(
+                    tunnel.id,
+                    tunnel.duckingEnabled,
+                    tunnel.duckingAmount,
+                    Number(e.target.value),
+                  )
                 }
                 title="Release time — how quickly non-priority inputs recover"
               />
-              <span className="ducking-release-val">{tunnel.duckingRelease}ms</span>
+              <span className="ducking-release-val">
+                {tunnel.duckingRelease}ms
+              </span>
             </>
           )}
         </div>

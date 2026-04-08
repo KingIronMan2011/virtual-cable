@@ -677,7 +677,9 @@ body::after {
   border-radius: 3px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .ducking-toggle:hover {
@@ -795,7 +797,9 @@ body::after {
   border-radius: 50%;
   background: var(--color-muted);
   border: 1px solid var(--color-border-hi);
-  transition: background 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
 }
 
 .gain-slider:hover::-webkit-slider-thumb {

@@ -63,7 +63,8 @@ function CableAnimation() {
         <div
           className="absolute inset-y-0 left-0 w-16 rounded-full"
           style={{
-            background: "linear-gradient(90deg, transparent, #f59e0b, transparent)",
+            background:
+              "linear-gradient(90deg, transparent, #f59e0b, transparent)",
             animation: "slide 1.6s linear infinite",
           }}
         />
@@ -171,12 +172,16 @@ const FEATURES = [
 
 function Features() {
   return (
-    <section id="features" className="py-20 px-6 border-t border-surface-border">
+    <section
+      id="features"
+      className="py-20 px-6 border-t border-surface-border"
+    >
       <div className="mx-auto max-w-6xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white">Everything you need</h2>
           <p className="mt-2 text-zinc-400">
-            Simple enough to set up in seconds. Powerful enough for complex rigs.
+            Simple enough to set up in seconds. Powerful enough for complex
+            rigs.
           </p>
         </div>
 
@@ -215,7 +220,7 @@ const STEPS = [
   {
     n: "03",
     title: "Go live",
-    body: 'Hit the power button. The cable goes live instantly. Use the mute button or VU meter to monitor the feed.',
+    body: "Hit the power button. The cable goes live instantly. Use the mute button or VU meter to monitor the feed.",
   },
 ];
 
@@ -225,13 +230,17 @@ function HowItWorks() {
       <div className="mx-auto max-w-4xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white">Up in 30 seconds</h2>
-          <p className="mt-2 text-zinc-400">No configuration files, no reboots.</p>
+          <p className="mt-2 text-zinc-400">
+            No configuration files, no reboots.
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 items-start">
           {STEPS.map(({ n, title, body }, i) => (
             <div key={n} className="flex-1 flex flex-col items-start">
-              <span className="text-xs font-mono font-bold text-brand mb-3">{n}</span>
+              <span className="text-xs font-mono font-bold text-brand mb-3">
+                {n}
+              </span>
               <h3 className="font-semibold text-white mb-2">{title}</h3>
               <p className="text-sm text-zinc-400 leading-relaxed">{body}</p>
               {i < STEPS.length - 1 && (
@@ -257,9 +266,7 @@ function DownloadCTA() {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-950/60 border border-amber-900/40 mb-5">
           <Cable size={22} className="text-brand" />
         </div>
-        <h2 className="text-3xl font-bold text-white mb-3">
-          Ready to patch?
-        </h2>
+        <h2 className="text-3xl font-bold text-white mb-3">Ready to patch?</h2>
         <p className="text-zinc-400 mb-7">
           Free forever. No account. No telemetry beyond an anonymous install
           count.

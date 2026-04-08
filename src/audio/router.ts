@@ -90,7 +90,11 @@ function applyGain(chunk: Buffer, gain: number): Buffer {
 function createMonitor(
   tunnelId: string,
   onLevel: (level: number) => void,
-): { transform: Transform; setMuted: (muted: boolean) => void; setGain: (gain: number) => void } {
+): {
+  transform: Transform;
+  setMuted: (muted: boolean) => void;
+  setGain: (gain: number) => void;
+} {
   let lastEmit = 0;
   let muted = false;
   let gain = 1;
@@ -98,19 +102,29 @@ function createMonitor(
     transform(chunk: Buffer, _enc, cb) {
       const now = Date.now();
       if (muted) {
-        if (now - lastEmit >= 50) { lastEmit = now; onLevel(0); }
+        if (now - lastEmit >= 50) {
+          lastEmit = now;
+          onLevel(0);
+        }
         cb(null, Buffer.alloc(chunk.length, 0));
         return;
       }
       const processed = applyGain(chunk, gain);
-      if (now - lastEmit >= 50) { lastEmit = now; onLevel(rmsLevel(processed)); }
+      if (now - lastEmit >= 50) {
+        lastEmit = now;
+        onLevel(rmsLevel(processed));
+      }
       cb(null, processed);
     },
   });
   return {
     transform,
-    setMuted: (m: boolean) => { muted = m; },
-    setGain: (g: number) => { gain = g; },
+    setMuted: (m: boolean) => {
+      muted = m;
+    },
+    setGain: (g: number) => {
+      gain = g;
+    },
   };
 }
 
@@ -176,23 +190,25 @@ export function createTunnel(
   // Device inputs: prefer MME (48 kHz via Windows audio mixer) over WASAPI.
   const sampleRate = isApp(inputConfigs[0])
     ? 48000
-    : primaryInputInfo?.hostAPIName === "MME" || outputInfo?.hostAPIName === "MME"
+    : primaryInputInfo?.hostAPIName === "MME" ||
+        outputInfo?.hostAPIName === "MME"
       ? 48000
-      : (outputInfo?.defaultSampleRate ?? primaryInputInfo?.defaultSampleRate ?? 48000);
+      : (outputInfo?.defaultSampleRate ??
+        primaryInputInfo?.defaultSampleRate ??
+        48000);
 
   const fpb = framesPerBuffer > 0 ? { framesPerBuffer } : {};
 
-  const makeInOptions = (deviceId: number) =>
-    ({
-      inOptions: {
-        channelCount: channels,
-        sampleFormat: SampleFormat16Bit,
-        sampleRate,
-        ...fpb,
-        deviceId,
-        closeOnError: true,
-      } as AudioIOOptions,
-    });
+  const makeInOptions = (deviceId: number) => ({
+    inOptions: {
+      channelCount: channels,
+      sampleFormat: SampleFormat16Bit,
+      sampleRate,
+      ...fpb,
+      deviceId,
+      closeOnError: true,
+    } as AudioIOOptions,
+  });
 
   // Per-input gain array — mutated in-place by setInputGain.
   const inputGains = inputConfigs.map((c) => c.gain);
@@ -299,7 +315,11 @@ export function createTunnel(
     } as AudioIOOptions,
   });
 
-  const { transform: monitor, setMuted, setGain } = createMonitor(tunnelId, (level) => {
+  const {
+    transform: monitor,
+    setMuted,
+    setGain,
+  } = createMonitor(tunnelId, (level) => {
     levelEmitter.emit("level", tunnelId, level);
   });
 
@@ -320,7 +340,10 @@ export function createTunnel(
     });
     (secInput as unknown as NodeJS.ReadableStream).pipe(sink);
     (secInput as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
-      console.error(`[tunnel:${tunnelId}] secondary input ${i} error:`, err.message);
+      console.error(
+        `[tunnel:${tunnelId}] secondary input ${i} error:`,
+        err.message,
+      );
     });
     secondaryInputs.push(secInput);
   }
@@ -448,7 +471,20 @@ export function reloadAllTunnels(framesPerBuffer: number): void {
     channelCount: pair.channelCount,
     duckingConfig: pair.duckingConfig,
   }));
-  for (const { id, inputConfigs, outputDeviceId, channelCount, duckingConfig } of snapshot) {
-    createTunnel(id, inputConfigs, outputDeviceId, framesPerBuffer, channelCount, duckingConfig);
+  for (const {
+    id,
+    inputConfigs,
+    outputDeviceId,
+    channelCount,
+    duckingConfig,
+  } of snapshot) {
+    createTunnel(
+      id,
+      inputConfigs,
+      outputDeviceId,
+      framesPerBuffer,
+      channelCount,
+      duckingConfig,
+    );
   }
 }

@@ -46,7 +46,11 @@ async function handleSquirrelEvents(): Promise<void> {
   if (!squirrelEvent?.startsWith("--squirrel-")) return;
 
   // Shortcut management via the Squirrel Update.exe sitting one level up
-  const updateExe = path.join(path.resolve(process.execPath, ".."), "..", "Update.exe");
+  const updateExe = path.join(
+    path.resolve(process.execPath, ".."),
+    "..",
+    "Update.exe",
+  );
   const exeName = path.basename(process.execPath);
   const shortcut = (flag: string) => spawnSync(updateExe, [flag, exeName]);
 
@@ -180,8 +184,22 @@ const effectiveFpb = (s: ReturnType<typeof loadSettings>) =>
 
 ipcMain.handle(
   "audio:createTunnel",
-  (_event, id: string, inputs: InputConfig[], outputId: number, channelCount: number | null, ducking: DuckingConfig) => {
-    createTunnel(id, inputs, outputId, effectiveFpb(loadSettings()), channelCount, ducking);
+  (
+    _event,
+    id: string,
+    inputs: InputConfig[],
+    outputId: number,
+    channelCount: number | null,
+    ducking: DuckingConfig,
+  ) => {
+    createTunnel(
+      id,
+      inputs,
+      outputId,
+      effectiveFpb(loadSettings()),
+      channelCount,
+      ducking,
+    );
   },
 );
 
@@ -301,8 +319,16 @@ app.on("ready", async () => {
 });
 
 function forceQuit(): void {
-  try { destroyAllTunnels(); } catch { /* ignore */ }
-  try { tray?.destroy(); } catch { /* ignore */ }
+  try {
+    destroyAllTunnels();
+  } catch {
+    /* ignore */
+  }
+  try {
+    tray?.destroy();
+  } catch {
+    /* ignore */
+  }
   process.exit(0);
 }
 

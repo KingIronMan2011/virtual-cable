@@ -11,7 +11,13 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type { AudioDevice, Tunnel, TunnelInput, InstallState, AppSettings } from "../types";
+import type {
+  AudioDevice,
+  Tunnel,
+  TunnelInput,
+  InstallState,
+  AppSettings,
+} from "../types";
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
 import SettingsPanel from "./components/SettingsPanel";
@@ -27,7 +33,9 @@ const SETTINGS_DEFAULTS: AppSettings = {
 
 export default function App() {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
-  const [audioApps, setAudioApps] = useState<{ pid: number; name: string; exe: string }[]>([]);
+  const [audioApps, setAudioApps] = useState<
+    { pid: number; name: string; exe: string }[]
+  >([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
@@ -105,60 +113,77 @@ export default function App() {
   }, []);
 
   // Device-change: always deactivates the tunnel, no IPC needed beyond destroy.
-  const updateTunnel = useCallback((updated: Tunnel) => {
-    enqueue(updated.id, async () => {
-      setTunnels((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
-      await window.electronAPI.destroyTunnel(updated.id);
-    });
-  }, [enqueue]);
+  const updateTunnel = useCallback(
+    (updated: Tunnel) => {
+      enqueue(updated.id, async () => {
+        setTunnels((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
+        await window.electronAPI.destroyTunnel(updated.id);
+      });
+    },
+    [enqueue],
+  );
 
   // Toggle active — reads from tunnelsRef at execution time so it always sees
   // the state committed by all previously-resolved queue operations.
-  const toggleTunnelActive = useCallback((id: string) => {
-    enqueue(id, async () => {
-      const current = tunnelsRef.current.find((t) => t.id === id);
-      if (!current) return;
-      const next: Tunnel = {
-        ...current,
-        active: !current.active,
-        // clear mute when going offline so it doesn't persist into next session
-        muted: current.active ? false : current.muted,
-      };
-      setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
-      // An input is "ready" if it has either a device or an app selected.
-      const readyInputs = next.inputs.filter(
-        (inp) => inp.deviceId !== null || inp.appPid !== null,
-      );
-      if (next.active && readyInputs.length > 0 && next.outputDeviceId !== null) {
-        await window.electronAPI.createTunnel(
-          next.id,
-          readyInputs.map((inp) => ({
-            deviceId: inp.deviceId ?? 0,
-            appPid: inp.appPid ?? undefined,
-            gain: inp.gain,
-            priority: inp.priority,
-          })),
-          next.outputDeviceId,
-          next.channelCount,
-          { enabled: next.duckingEnabled, amount: next.duckingAmount, release: next.duckingRelease },
+  const toggleTunnelActive = useCallback(
+    (id: string) => {
+      enqueue(id, async () => {
+        const current = tunnelsRef.current.find((t) => t.id === id);
+        if (!current) return;
+        const next: Tunnel = {
+          ...current,
+          active: !current.active,
+          // clear mute when going offline so it doesn't persist into next session
+          muted: current.active ? false : current.muted,
+        };
+        setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
+        // An input is "ready" if it has either a device or an app selected.
+        const readyInputs = next.inputs.filter(
+          (inp) => inp.deviceId !== null || inp.appPid !== null,
         );
-        await window.electronAPI.setTunnelMuted(next.id, next.muted);
-      } else {
-        await window.electronAPI.destroyTunnel(next.id);
-      }
-    });
-  }, [enqueue]);
+        if (
+          next.active &&
+          readyInputs.length > 0 &&
+          next.outputDeviceId !== null
+        ) {
+          await window.electronAPI.createTunnel(
+            next.id,
+            readyInputs.map((inp) => ({
+              deviceId: inp.deviceId ?? 0,
+              appPid: inp.appPid ?? undefined,
+              gain: inp.gain,
+              priority: inp.priority,
+            })),
+            next.outputDeviceId,
+            next.channelCount,
+            {
+              enabled: next.duckingEnabled,
+              amount: next.duckingAmount,
+              release: next.duckingRelease,
+            },
+          );
+          await window.electronAPI.setTunnelMuted(next.id, next.muted);
+        } else {
+          await window.electronAPI.destroyTunnel(next.id);
+        }
+      });
+    },
+    [enqueue],
+  );
 
   // Toggle mute — reads from tunnelsRef at execution time.
-  const toggleTunnelMute = useCallback((id: string) => {
-    enqueue(id, async () => {
-      const current = tunnelsRef.current.find((t) => t.id === id);
-      if (!current?.active) return;
-      const next: Tunnel = { ...current, muted: !current.muted };
-      setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
-      await window.electronAPI.setTunnelMuted(next.id, next.muted);
-    });
-  }, [enqueue]);
+  const toggleTunnelMute = useCallback(
+    (id: string) => {
+      enqueue(id, async () => {
+        const current = tunnelsRef.current.find((t) => t.id === id);
+        if (!current?.active) return;
+        const next: Tunnel = { ...current, muted: !current.muted };
+        setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
+        await window.electronAPI.setTunnelMuted(next.id, next.muted);
+      });
+    },
+    [enqueue],
+  );
 
   // Set master gain — live update, no tunnel restart needed.
   const setTunnelGain = useCallback((id: string, gain: number) => {
@@ -180,7 +205,8 @@ export default function App() {
         }),
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
-      if (current?.active) window.electronAPI.setTunnelInputGain(id, inputIndex, gain);
+      if (current?.active)
+        window.electronAPI.setTunnelInputGain(id, inputIndex, gain);
     },
     [],
   );
@@ -198,16 +224,26 @@ export default function App() {
         }),
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
-      if (current?.active) window.electronAPI.setTunnelInputPriority(id, inputIndex, priority);
+      if (current?.active)
+        window.electronAPI.setTunnelInputPriority(id, inputIndex, priority);
     },
     [],
   );
 
   // Set ducking config — live update, no tunnel restart needed.
   const setTunnelDucking = useCallback(
-    (id: string, duckingEnabled: boolean, duckingAmount: number, duckingRelease: number) => {
+    (
+      id: string,
+      duckingEnabled: boolean,
+      duckingAmount: number,
+      duckingRelease: number,
+    ) => {
       setTunnels((ts) =>
-        ts.map((t) => (t.id !== id ? t : { ...t, duckingEnabled, duckingAmount, duckingRelease })),
+        ts.map((t) =>
+          t.id !== id
+            ? t
+            : { ...t, duckingEnabled, duckingAmount, duckingRelease },
+        ),
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
       if (current?.active) {
@@ -261,25 +297,49 @@ export default function App() {
       const imported: Tunnel[] = parsed.map((t: Record<string, unknown>) => {
         const inputs: TunnelInput[] =
           Array.isArray(t.inputs) && t.inputs.length > 0
-            ? (t.inputs as { deviceId?: unknown; appPid?: unknown; gain?: unknown; priority?: unknown }[]).map((inp) => ({
-                deviceId: typeof inp.deviceId === "number" ? inp.deviceId : null,
+            ? (
+                t.inputs as {
+                  deviceId?: unknown;
+                  appPid?: unknown;
+                  gain?: unknown;
+                  priority?: unknown;
+                }[]
+              ).map((inp) => ({
+                deviceId:
+                  typeof inp.deviceId === "number" ? inp.deviceId : null,
                 appPid: typeof inp.appPid === "number" ? inp.appPid : null,
                 gain: typeof inp.gain === "number" ? inp.gain : 1,
-                priority: typeof inp.priority === "boolean" ? inp.priority : false,
+                priority:
+                  typeof inp.priority === "boolean" ? inp.priority : false,
               }))
-            : [{ deviceId: typeof t.inputDeviceId === "number" ? t.inputDeviceId : null, appPid: null, gain: 1, priority: false }];
+            : [
+                {
+                  deviceId:
+                    typeof t.inputDeviceId === "number"
+                      ? t.inputDeviceId
+                      : null,
+                  appPid: null,
+                  gain: 1,
+                  priority: false,
+                },
+              ];
         return {
           id: crypto.randomUUID(),
           name: String(t.name ?? "Cable"),
           inputs,
-          outputDeviceId: typeof t.outputDeviceId === "number" ? t.outputDeviceId : null,
+          outputDeviceId:
+            typeof t.outputDeviceId === "number" ? t.outputDeviceId : null,
           active: false,
           muted: false,
-          channelCount: typeof t.channelCount === "number" ? t.channelCount : null,
+          channelCount:
+            typeof t.channelCount === "number" ? t.channelCount : null,
           gain: typeof t.gain === "number" ? t.gain : 1,
-          duckingEnabled: typeof t.duckingEnabled === "boolean" ? t.duckingEnabled : false,
-          duckingAmount: typeof t.duckingAmount === "number" ? t.duckingAmount : 0.15,
-          duckingRelease: typeof t.duckingRelease === "number" ? t.duckingRelease : 1000,
+          duckingEnabled:
+            typeof t.duckingEnabled === "boolean" ? t.duckingEnabled : false,
+          duckingAmount:
+            typeof t.duckingAmount === "number" ? t.duckingAmount : 0.15,
+          duckingRelease:
+            typeof t.duckingRelease === "number" ? t.duckingRelease : 1000,
         };
       });
       setTunnels(imported);
