@@ -7,12 +7,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getDevices: (): Promise<AudioDevice[]> =>
     ipcRenderer.invoke("audio:getDevices"),
 
+  getAudioApps: (): Promise<{ pid: number; name: string; exe: string }[]> =>
+    ipcRenderer.invoke("audio:getAudioApps"),
+
   createTunnel: (
     id: string,
-    inputId: number,
+    inputs: { deviceId: number; appPid?: number; gain: number; priority: boolean }[],
     outputId: number,
+    channelCount: number | null,
+    ducking: { enabled: boolean; amount: number; release: number },
   ): Promise<void> =>
-    ipcRenderer.invoke("audio:createTunnel", id, inputId, outputId),
+    ipcRenderer.invoke("audio:createTunnel", id, inputs, outputId, channelCount, ducking),
 
   destroyTunnel: (id: string): Promise<void> =>
     ipcRenderer.invoke("audio:destroyTunnel", id),
@@ -35,6 +40,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   loadTunnels: (): Promise<Tunnel[]> => ipcRenderer.invoke("store:loadTunnels"),
+
+  exportLayout: (json: string): Promise<boolean> =>
+    ipcRenderer.invoke("store:exportLayout", json),
+
+  importLayout: (): Promise<string | null> =>
+    ipcRenderer.invoke("store:importLayout"),
 
   saveTunnels: (tunnels: Tunnel[]): Promise<void> =>
     ipcRenderer.invoke("store:saveTunnels", tunnels),
@@ -60,8 +71,26 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getTunnelSampleRate: (id: string): Promise<number | null> =>
     ipcRenderer.invoke("audio:getTunnelSampleRate", id),
 
+  getTunnelChannelCount: (id: string): Promise<number | null> =>
+    ipcRenderer.invoke("audio:getTunnelChannelCount", id),
+
   setTunnelMuted: (id: string, muted: boolean): Promise<void> =>
     ipcRenderer.invoke("audio:setTunnelMuted", id, muted),
+
+  setTunnelGain: (id: string, gain: number): Promise<void> =>
+    ipcRenderer.invoke("audio:setTunnelGain", id, gain),
+
+  setTunnelInputGain: (id: string, inputIndex: number, gain: number): Promise<void> =>
+    ipcRenderer.invoke("audio:setTunnelInputGain", id, inputIndex, gain),
+
+  setTunnelInputPriority: (id: string, inputIndex: number, priority: boolean): Promise<void> =>
+    ipcRenderer.invoke("audio:setTunnelInputPriority", id, inputIndex, priority),
+
+  setTunnelDucking: (
+    id: string,
+    ducking: { enabled: boolean; amount: number; release: number },
+  ): Promise<void> =>
+    ipcRenderer.invoke("audio:setTunnelDucking", id, ducking),
 
   onAudioLevel: (
     cb: (tunnelId: string, level: number) => void,

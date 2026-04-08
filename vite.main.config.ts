@@ -6,7 +6,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: ["electron", "naudiodon"],
+      external: ["electron", "naudiodon", "app-capture"],
       output: {
         // Prepend a module.paths patch so Node can resolve native modules that
         // were copied to resources/node_modules/ via extraResources. This runs

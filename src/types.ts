@@ -5,13 +5,34 @@ export interface AudioDevice {
   maxOutputChannels: number;
 }
 
+export interface TunnelInput {
+  /** PortAudio device ID, or null when appPid is set / nothing selected. */
+  deviceId: number | null;
+  /** Windows process ID for app loopback capture; null = device input. */
+  appPid: number | null;
+  /** Linear gain for this input source. 1.0 = unity. */
+  gain: number;
+  /** When true, this input can trigger ducking of non-priority inputs. */
+  priority: boolean;
+}
+
 export interface Tunnel {
   id: string;
   name: string;
-  inputDeviceId: number | null;
+  inputs: TunnelInput[];
   outputDeviceId: number | null;
   active: boolean;
   muted: boolean;
+  /** Explicit channel count, or null to auto-detect from device capabilities. */
+  channelCount: number | null;
+  /** Master linear gain applied after mixing. 1.0 = unity. */
+  gain: number;
+  /** Ducking: when a priority input exceeds –30 dBFS, non-priority inputs are attenuated. */
+  duckingEnabled: boolean;
+  /** Target linear gain for ducked non-priority inputs (0–1). e.g. 0.15 ≈ −16 dB. */
+  duckingAmount: number;
+  /** Ducking release time in milliseconds (how quickly non-priority inputs recover). */
+  duckingRelease: number;
 }
 
 export interface AudioIOOptions {

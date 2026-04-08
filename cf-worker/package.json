@@ -1,0 +1,15 @@
+{
+  "name": "virtual-cable-analytics",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute virtual-cable-analytics --file=./schema.sql --remote",
+    "db:init:local": "wrangler d1 execute virtual-cable-analytics --file=./schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

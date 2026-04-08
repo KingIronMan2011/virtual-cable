@@ -22,7 +22,14 @@
       "Bash(npm show:*)",
       "Bash(npx tsc:*)",
       "Bash(node_modules/.bin/electron-rebuild --version)",
-      "Bash(node_modules/.bin/electron-rebuild -f -w segfault-handler -v 41.1.1)"
+      "Bash(node_modules/.bin/electron-rebuild -f -w segfault-handler -v 41.1.1)",
+      "Bash(npx electron-rebuild:*)",
+      "Bash(node-gyp configure:*)",
+      "Bash(node-gyp build:*)",
+      "Bash(npx node-gyp:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(taskkill /F /IM electron.exe)",
+      "Bash(taskkill /F /IM \"virtual-cable.exe\")"
     ]
   }
 }

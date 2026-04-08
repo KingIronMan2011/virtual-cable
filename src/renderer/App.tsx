@@ -2,14 +2,16 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Download,
   ExternalLink,
   Hexagon,
   Plus,
   RefreshCw,
   Settings,
+  Upload,
   X,
 } from "lucide-react";
-import type { AudioDevice, Tunnel, InstallState, AppSettings } from "../types";
+import type { AudioDevice, Tunnel, TunnelInput, InstallState, AppSettings } from "../types";
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
 import SettingsPanel from "./components/SettingsPanel";
@@ -25,6 +27,7 @@ const SETTINGS_DEFAULTS: AppSettings = {
 
 export default function App() {
   const [devices, setDevices] = useState<AudioDevice[]>([]);
+  const [audioApps, setAudioApps] = useState<{ pid: number; name: string; exe: string }[]>([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
@@ -35,6 +38,14 @@ export default function App() {
   const [installPct, setInstallPct] = useState(0);
   const [installError, setInstallError] = useState("");
   const loaded = useRef(false);
+  // Per-tunnel serial queue — each call chains off the previous so IPC messages
+  // for the same tunnel always arrive in the order the user triggered them.
+  const updateQueues = useRef(new Map<string, Promise<void>>());
+  // Mirror of `tunnels` state, updated synchronously on every render.
+  // Queue operations read from this ref at execution time (after all prior async
+  // IPC calls resolve and React has re-rendered), so they always see fresh state.
+  const tunnelsRef = useRef<Tunnel[]>([]);
+  tunnelsRef.current = tunnels;
 
   useEffect(() => {
     Promise.all([
@@ -42,8 +53,10 @@ export default function App() {
       window.electronAPI.loadTunnels(),
       window.electronAPI.checkVBAudioInstalled(),
       window.electronAPI.loadSettings(),
-    ]).then(([devs, saved, installed, s]) => {
+      window.electronAPI.getAudioApps(),
+    ]).then(([devs, saved, installed, s, apps]) => {
       setDevices(devs);
+      setAudioApps(apps);
       setTunnels(saved);
       setVbInstalled(installed);
       setSettings(s);
@@ -64,10 +77,15 @@ export default function App() {
         {
           id: crypto.randomUUID(),
           name: `Cable ${String(n).padStart(2, "0")}`,
-          inputDeviceId: null,
+          inputs: [{ deviceId: null, appPid: null, gain: 1, priority: false }],
           outputDeviceId: null,
           active: false,
           muted: false,
+          channelCount: null,
+          gain: 1,
+          duckingEnabled: false,
+          duckingAmount: 0.15,
+          duckingRelease: 1000,
         },
       ];
     });
@@ -76,32 +94,197 @@ export default function App() {
   const deleteTunnel = useCallback(async (id: string) => {
     await window.electronAPI.destroyTunnel(id);
     setTunnels((prev) => prev.filter((t) => t.id !== id));
+    updateQueues.current.delete(id);
   }, []);
 
-  const updateTunnel = useCallback(async (updated: Tunnel) => {
-    let prev: Tunnel | undefined;
-    setTunnels((ts) => {
-      prev = ts.find((t) => t.id === updated.id);
-      return ts.map((t) => (t.id === updated.id ? updated : t));
-    });
+  // Enqueue an async operation for a tunnel onto its serial queue.
+  // One failure swallows so it doesn't stall subsequent operations.
+  const enqueue = useCallback((id: string, op: () => Promise<void>) => {
+    const tail = (updateQueues.current.get(id) ?? Promise.resolve()).then(op);
+    updateQueues.current.set(id, tail.catch(console.error));
+  }, []);
 
-    if (
-      updated.active &&
-      updated.inputDeviceId !== null &&
-      updated.outputDeviceId !== null
-    ) {
-      // Only (re)create the stream when going from inactive → active
-      if (!prev?.active) {
-        await window.electronAPI.createTunnel(
-          updated.id,
-          updated.inputDeviceId,
-          updated.outputDeviceId,
-        );
-      }
-      // Apply mute state whenever the tunnel is active (handles mute toggle on live tunnel)
-      await window.electronAPI.setTunnelMuted(updated.id, updated.muted);
-    } else {
+  // Device-change: always deactivates the tunnel, no IPC needed beyond destroy.
+  const updateTunnel = useCallback((updated: Tunnel) => {
+    enqueue(updated.id, async () => {
+      setTunnels((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
       await window.electronAPI.destroyTunnel(updated.id);
+    });
+  }, [enqueue]);
+
+  // Toggle active — reads from tunnelsRef at execution time so it always sees
+  // the state committed by all previously-resolved queue operations.
+  const toggleTunnelActive = useCallback((id: string) => {
+    enqueue(id, async () => {
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (!current) return;
+      const next: Tunnel = {
+        ...current,
+        active: !current.active,
+        // clear mute when going offline so it doesn't persist into next session
+        muted: current.active ? false : current.muted,
+      };
+      setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
+      // An input is "ready" if it has either a device or an app selected.
+      const readyInputs = next.inputs.filter(
+        (inp) => inp.deviceId !== null || inp.appPid !== null,
+      );
+      if (next.active && readyInputs.length > 0 && next.outputDeviceId !== null) {
+        await window.electronAPI.createTunnel(
+          next.id,
+          readyInputs.map((inp) => ({
+            deviceId: inp.deviceId ?? 0,
+            appPid: inp.appPid ?? undefined,
+            gain: inp.gain,
+            priority: inp.priority,
+          })),
+          next.outputDeviceId,
+          next.channelCount,
+          { enabled: next.duckingEnabled, amount: next.duckingAmount, release: next.duckingRelease },
+        );
+        await window.electronAPI.setTunnelMuted(next.id, next.muted);
+      } else {
+        await window.electronAPI.destroyTunnel(next.id);
+      }
+    });
+  }, [enqueue]);
+
+  // Toggle mute — reads from tunnelsRef at execution time.
+  const toggleTunnelMute = useCallback((id: string) => {
+    enqueue(id, async () => {
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (!current?.active) return;
+      const next: Tunnel = { ...current, muted: !current.muted };
+      setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
+      await window.electronAPI.setTunnelMuted(next.id, next.muted);
+    });
+  }, [enqueue]);
+
+  // Set master gain — live update, no tunnel restart needed.
+  const setTunnelGain = useCallback((id: string, gain: number) => {
+    setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, gain } : t)));
+    const current = tunnelsRef.current.find((t) => t.id === id);
+    if (current?.active) window.electronAPI.setTunnelGain(id, gain);
+  }, []);
+
+  // Set per-input gain — live update, no tunnel restart needed.
+  const setTunnelInputGain = useCallback(
+    (id: string, inputIndex: number, gain: number) => {
+      setTunnels((ts) =>
+        ts.map((t) => {
+          if (t.id !== id) return t;
+          const inputs = t.inputs.map((inp, i) =>
+            i === inputIndex ? { ...inp, gain } : inp,
+          );
+          return { ...t, inputs };
+        }),
+      );
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (current?.active) window.electronAPI.setTunnelInputGain(id, inputIndex, gain);
+    },
+    [],
+  );
+
+  // Set input priority — live update, no tunnel restart needed.
+  const setTunnelInputPriority = useCallback(
+    (id: string, inputIndex: number, priority: boolean) => {
+      setTunnels((ts) =>
+        ts.map((t) => {
+          if (t.id !== id) return t;
+          const inputs = t.inputs.map((inp, i) =>
+            i === inputIndex ? { ...inp, priority } : inp,
+          );
+          return { ...t, inputs };
+        }),
+      );
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (current?.active) window.electronAPI.setTunnelInputPriority(id, inputIndex, priority);
+    },
+    [],
+  );
+
+  // Set ducking config — live update, no tunnel restart needed.
+  const setTunnelDucking = useCallback(
+    (id: string, duckingEnabled: boolean, duckingAmount: number, duckingRelease: number) => {
+      setTunnels((ts) =>
+        ts.map((t) => (t.id !== id ? t : { ...t, duckingEnabled, duckingAmount, duckingRelease })),
+      );
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (current?.active) {
+        window.electronAPI.setTunnelDucking(id, {
+          enabled: duckingEnabled,
+          amount: duckingAmount,
+          release: duckingRelease,
+        });
+      }
+    },
+    [],
+  );
+
+  // Rename — only touches the name, never restarts the stream.
+  const renameTunnel = useCallback((id: string, name: string) => {
+    setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, name } : t)));
+  }, []);
+
+  // Reorder via drag-and-drop.
+  const reorderTunnels = useCallback((from: number, to: number) => {
+    if (from === to) return;
+    setTunnels((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }, []);
+
+  // Export current layout to a user-chosen JSON file.
+  const exportLayout = useCallback(async () => {
+    const snapshot = tunnelsRef.current.map((t) => ({
+      ...t,
+      active: false,
+      muted: false,
+    }));
+    await window.electronAPI.exportLayout(JSON.stringify(snapshot, null, 2));
+  }, []);
+
+  // Import layout from a JSON file — replaces all cables, stops active ones first.
+  const importLayout = useCallback(async () => {
+    const raw = await window.electronAPI.importLayout();
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      // Destroy all active tunnels before replacing state
+      for (const t of tunnelsRef.current) {
+        if (t.active) await window.electronAPI.destroyTunnel(t.id);
+      }
+      const imported: Tunnel[] = parsed.map((t: Record<string, unknown>) => {
+        const inputs: TunnelInput[] =
+          Array.isArray(t.inputs) && t.inputs.length > 0
+            ? (t.inputs as { deviceId?: unknown; appPid?: unknown; gain?: unknown; priority?: unknown }[]).map((inp) => ({
+                deviceId: typeof inp.deviceId === "number" ? inp.deviceId : null,
+                appPid: typeof inp.appPid === "number" ? inp.appPid : null,
+                gain: typeof inp.gain === "number" ? inp.gain : 1,
+                priority: typeof inp.priority === "boolean" ? inp.priority : false,
+              }))
+            : [{ deviceId: typeof t.inputDeviceId === "number" ? t.inputDeviceId : null, appPid: null, gain: 1, priority: false }];
+        return {
+          id: crypto.randomUUID(),
+          name: String(t.name ?? "Cable"),
+          inputs,
+          outputDeviceId: typeof t.outputDeviceId === "number" ? t.outputDeviceId : null,
+          active: false,
+          muted: false,
+          channelCount: typeof t.channelCount === "number" ? t.channelCount : null,
+          gain: typeof t.gain === "number" ? t.gain : 1,
+          duckingEnabled: typeof t.duckingEnabled === "boolean" ? t.duckingEnabled : false,
+          duckingAmount: typeof t.duckingAmount === "number" ? t.duckingAmount : 0.15,
+          duckingRelease: typeof t.duckingRelease === "number" ? t.duckingRelease : 1000,
+        };
+      });
+      setTunnels(imported);
+    } catch {
+      // Silently ignore malformed files
     }
   }, []);
 
@@ -137,11 +320,13 @@ export default function App() {
   }, []);
 
   const rescanDevices = useCallback(async () => {
-    const [devs, installed] = await Promise.all([
+    const [devs, installed, apps] = await Promise.all([
       window.electronAPI.getDevices(),
       window.electronAPI.checkVBAudioInstalled(),
+      window.electronAPI.getAudioApps(),
     ]);
     setDevices(devs);
+    setAudioApps(apps);
     setVbInstalled(installed);
     if (installed) setVbToastDismissed(false);
   }, []);
@@ -208,6 +393,21 @@ export default function App() {
           <div className="meta-divider" />
           <button
             className="header-settings-btn"
+            onClick={exportLayout}
+            title="Export cable layout"
+          >
+            <Download size={14} strokeWidth={1.75} />
+          </button>
+          <button
+            className="header-settings-btn"
+            onClick={importLayout}
+            title="Import cable layout"
+          >
+            <Upload size={14} strokeWidth={1.75} />
+          </button>
+          <div className="meta-divider" />
+          <button
+            className="header-settings-btn"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
           >
@@ -221,7 +421,16 @@ export default function App() {
           <TunnelList
             tunnels={tunnels}
             devices={devices}
+            audioApps={audioApps}
             onUpdate={updateTunnel}
+            onToggleActive={toggleTunnelActive}
+            onToggleMute={toggleTunnelMute}
+            onSetGain={setTunnelGain}
+            onSetInputGain={setTunnelInputGain}
+            onSetInputPriority={setTunnelInputPriority}
+            onSetDucking={setTunnelDucking}
+            onRename={renameTunnel}
+            onReorder={reorderTunnels}
             onDelete={deleteTunnel}
             expSampleRate={
               settings.experimentalFeatures && settings.expSampleRate

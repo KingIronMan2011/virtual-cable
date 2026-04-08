@@ -18,6 +18,7 @@ import { cp, mkdir } from "node:fs/promises";
 const NATIVE_MODULES = [
   "naudiodon",
   "segfault-handler",
+  "app-capture",
   "bindings", // naudiodon's native-loader dep
   "file-uri-to-path", // bindings' dep
 ];
@@ -42,10 +43,8 @@ const config: ForgeConfig = {
     },
   },
   rebuildConfig: {
-    // Both naudiodon and its dep segfault-handler must be compiled against
-    // Electron's ABI — if either is compiled against plain Node the load fails
-    // and manifests as "cannot find module naudiodon".
-    onlyModules: ["naudiodon", "segfault-handler"],
+    // Native modules must be compiled against Electron's ABI.
+    onlyModules: ["naudiodon", "segfault-handler", "app-capture"],
     force: true,
   },
   hooks: {

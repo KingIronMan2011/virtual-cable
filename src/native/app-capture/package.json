@@ -1,0 +1,8 @@
+{
+  "name": "app-capture",
+  "version": "1.0.0",
+  "description": "Per-process audio capture via Windows WASAPI process loopback",
+  "main": "build/Release/app-capture.node",
+  "gypfile": true,
+  "license": "MIT"
+}

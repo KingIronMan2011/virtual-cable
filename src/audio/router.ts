@@ -1,16 +1,43 @@
 import { EventEmitter } from "node:events";
-import { Transform } from "node:stream";
+import { Transform, Writable } from "node:stream";
 import { AudioIO, SampleFormat16Bit, getDevices } from "naudiodon";
 import type { DeviceInfo } from "naudiodon";
 import type { AudioIOOptions } from "../types";
+import { AppCaptureReadable } from "./appCapture";
+
+export interface InputConfig {
+  deviceId: number;
+  /** Process ID for app loopback capture; undefined = device input. */
+  appPid?: number;
+  gain: number;
+  priority: boolean;
+}
+
+export interface DuckingConfig {
+  enabled: boolean;
+  /** Target linear gain for ducked non-priority inputs (0–1). */
+  amount: number;
+  /** Release time in milliseconds. */
+  release: number;
+}
+
+type AnyInputStream = InstanceType<typeof AudioIO> | AppCaptureReadable;
 
 interface StreamPair {
-  input: InstanceType<typeof AudioIO>;
+  primaryInput: AnyInputStream;
+  secondaryInputs: AnyInputStream[];
   output: InstanceType<typeof AudioIO>;
-  inputDeviceId: number;
+  /** Original (pre-resolve) input configs with current gains + priorities. */
+  inputConfigs: InputConfig[];
   outputDeviceId: number;
   sampleRate: number;
+  channelCount: number;
+  duckingConfig: DuckingConfig;
   setMuted: (muted: boolean) => void;
+  setGain: (gain: number) => void;
+  setInputGain: (inputIndex: number, gain: number) => void;
+  setInputPriority: (inputIndex: number, priority: boolean) => void;
+  setDucking: (cfg: DuckingConfig) => void;
 }
 
 const activeTunnels = new Map<string, StreamPair>();
@@ -18,7 +45,7 @@ const activeTunnels = new Map<string, StreamPair>();
 /** Emits `("level", tunnelId: string, level: number)` at ~20 fps per active tunnel. */
 export const levelEmitter = new EventEmitter();
 
-function tryQuit(stream: InstanceType<typeof AudioIO> | null): void {
+function tryQuit(stream: AnyInputStream | null): void {
   if (!stream) return;
   try {
     stream.quit();
@@ -44,37 +71,46 @@ function rmsLevel(chunk: Buffer): number {
   return Math.max(0, Math.min(1, (db + 60) / 60));
 }
 
-/** Pass-through Transform that samples RMS level and emits it at most every 50 ms.
- *  When muted, replaces audio data with silence and emits level 0. */
+/**
+ * Applies gain to a 16-bit LE PCM buffer.
+ * Returns the original buffer unchanged when gain === 1 (zero-copy).
+ */
+function applyGain(chunk: Buffer, gain: number): Buffer {
+  if (gain === 1) return chunk;
+  const out = Buffer.allocUnsafe(chunk.length);
+  for (let i = 0; i + 1 < chunk.length; i += 2) {
+    const s = Math.round(chunk.readInt16LE(i) * gain);
+    out.writeInt16LE(Math.max(-32768, Math.min(32767, s)), i);
+  }
+  return out;
+}
+
+/** Pass-through Transform that applies master gain, samples RMS level every
+ *  50 ms, and replaces audio with silence when muted. */
 function createMonitor(
   tunnelId: string,
   onLevel: (level: number) => void,
-): { transform: Transform; setMuted: (muted: boolean) => void } {
+): { transform: Transform; setMuted: (muted: boolean) => void; setGain: (gain: number) => void } {
   let lastEmit = 0;
   let muted = false;
+  let gain = 1;
   const transform = new Transform({
     transform(chunk: Buffer, _enc, cb) {
       const now = Date.now();
       if (muted) {
-        if (now - lastEmit >= 50) {
-          lastEmit = now;
-          onLevel(0);
-        }
+        if (now - lastEmit >= 50) { lastEmit = now; onLevel(0); }
         cb(null, Buffer.alloc(chunk.length, 0));
         return;
       }
-      if (now - lastEmit >= 50) {
-        lastEmit = now;
-        onLevel(rmsLevel(chunk));
-      }
-      cb(null, chunk);
+      const processed = applyGain(chunk, gain);
+      if (now - lastEmit >= 50) { lastEmit = now; onLevel(rmsLevel(processed)); }
+      cb(null, processed);
     },
   });
   return {
     transform,
-    setMuted: (m: boolean) => {
-      muted = m;
-    },
+    setMuted: (m: boolean) => { muted = m; },
+    setGain: (g: number) => { gain = g; },
   };
 }
 
@@ -105,52 +141,152 @@ function resolveRoutingId(deviceId: number, all: DeviceInfo[]): number {
 
 export function createTunnel(
   tunnelId: string,
-  inputDeviceId: number,
+  inputConfigs: InputConfig[],
   outputDeviceId: number,
   framesPerBuffer = 0,
+  requestedChannels: number | null = null,
+  ducking: DuckingConfig = { enabled: false, amount: 0.15, release: 1000 },
 ): void {
   if (activeTunnels.has(tunnelId)) destroyTunnel(tunnelId);
+  if (inputConfigs.length === 0) return;
 
   const all = getDevices();
-
-  const routingInputId = resolveRoutingId(inputDeviceId, all);
+  const isApp = (cfg: InputConfig) => cfg.appPid != null;
+  const routingInputIds = inputConfigs.map((c) =>
+    isApp(c) ? 0 : resolveRoutingId(c.deviceId, all),
+  );
   const routingOutputId = resolveRoutingId(outputDeviceId, all);
 
-  const inputInfo = all.find((d) => d.id === routingInputId);
+  // App inputs don't map to PortAudio devices; use output device capabilities.
+  const primaryInputInfo = isApp(inputConfigs[0])
+    ? undefined
+    : all.find((d) => d.id === routingInputIds[0]);
   const outputInfo = all.find((d) => d.id === routingOutputId);
 
-  const channels = Math.min(
-    inputInfo?.maxInputChannels ?? 1,
+  const maxChannels = Math.min(
+    primaryInputInfo?.maxInputChannels ?? outputInfo?.maxOutputChannels ?? 2,
     outputInfo?.maxOutputChannels ?? 2,
-    2,
   );
+  const channels =
+    requestedChannels !== null
+      ? Math.min(requestedChannels, maxChannels)
+      : maxChannels;
 
-  // MME goes through Windows audio mixer — 48000 is universally accepted.
-  // If routing fell back to WASAPI (no MME equivalent found), use the
-  // output device's reported default rate which is the safest single choice.
-  const sampleRate =
-    inputInfo?.hostAPIName === "MME" || outputInfo?.hostAPIName === "MME"
+  // App inputs always run at 48 kHz (Windows default mix rate).
+  // Device inputs: prefer MME (48 kHz via Windows audio mixer) over WASAPI.
+  const sampleRate = isApp(inputConfigs[0])
+    ? 48000
+    : primaryInputInfo?.hostAPIName === "MME" || outputInfo?.hostAPIName === "MME"
       ? 48000
-      : (outputInfo?.defaultSampleRate ??
-        inputInfo?.defaultSampleRate ??
-        48000);
+      : (outputInfo?.defaultSampleRate ?? primaryInputInfo?.defaultSampleRate ?? 48000);
 
-  // TS6 infers a narrow type for `new AudioIO(...)` (it's typed as a function, not
-  // a class) so framesPerBuffer triggers excess-property checks. Cast to any to
-  // pass it through — the naudiodon AudioOptions interface does include the field.
-  // framesPerBuffer=0 means "let PortAudio choose" (original stable behaviour).
   const fpb = framesPerBuffer > 0 ? { framesPerBuffer } : {};
 
-  const input = new AudioIO({
-    inOptions: {
-      channelCount: channels,
-      sampleFormat: SampleFormat16Bit,
-      sampleRate,
-      ...fpb,
-      deviceId: routingInputId,
-      closeOnError: true,
-    } as AudioIOOptions,
+  const makeInOptions = (deviceId: number) =>
+    ({
+      inOptions: {
+        channelCount: channels,
+        sampleFormat: SampleFormat16Bit,
+        sampleRate,
+        ...fpb,
+        deviceId,
+        closeOnError: true,
+      } as AudioIOOptions,
+    });
+
+  // Per-input gain array — mutated in-place by setInputGain.
+  const inputGains = inputConfigs.map((c) => c.gain);
+  // Per-input priority array — mutated in-place by setInputPriority.
+  const priorityMask = inputConfigs.map((c) => c.priority);
+
+  // Ducking state — mutated in-place by setDucking.
+  // Threshold is fixed at -30 dBFS (= 0.5 on the 0–1 normalised scale).
+  const DUCK_THRESHOLD = 0.5;
+  let duckEnabled = ducking.enabled;
+  let duckAmount = ducking.amount;
+  let duckReleaseMs = ducking.release;
+  // Smoothed gain applied to non-priority inputs (1.0 = fully open, duckAmount = fully ducked).
+  let duckGain = 1.0;
+
+  // Mixer Transform: driven by primary input chunks.
+  // Secondary inputs store their latest chunk; the mixer reads whatever
+  // they last produced (or silence if they haven't produced yet).
+  const latestSecondaryChunks: (Buffer | null)[] = new Array(
+    Math.max(0, inputConfigs.length - 1),
+  ).fill(null);
+
+  const mixerTransform = new Transform({
+    transform(primaryChunk: Buffer, _enc, cb) {
+      // Ducking: determine whether any priority input is above threshold this chunk.
+      const hasPriority = priorityMask.some((p) => p);
+      const hasNonPriority = priorityMask.some((p) => !p);
+      const canDuck = duckEnabled && hasPriority && hasNonPriority;
+
+      if (canDuck) {
+        let shouldDuck = false;
+        if (priorityMask[0] && rmsLevel(primaryChunk) > DUCK_THRESHOLD) {
+          shouldDuck = true;
+        }
+        if (!shouldDuck) {
+          for (let s = 0; s < latestSecondaryChunks.length; s++) {
+            const buf = latestSecondaryChunks[s];
+            if (buf && priorityMask[s + 1] && rmsLevel(buf) > DUCK_THRESHOLD) {
+              shouldDuck = true;
+              break;
+            }
+          }
+        }
+        // Exponential smoothing: attack = 20 ms fixed, release = user-configured.
+        const frameCount = primaryChunk.length / 2 / channels;
+        const chunkMs = (frameCount / sampleRate) * 1000;
+        if (shouldDuck) {
+          const alpha = Math.exp(-chunkMs / 20); // 20 ms attack
+          duckGain = alpha * duckGain + (1 - alpha) * duckAmount;
+        } else {
+          const alpha = Math.exp(-chunkMs / Math.max(duckReleaseMs, 1));
+          duckGain = alpha * duckGain + (1 - alpha) * 1.0;
+          if (duckGain > 0.999) duckGain = 1.0; // snap to avoid drift
+        }
+      } else {
+        duckGain = 1.0;
+      }
+
+      // Fast path: single input, unity gain, no ducking involved.
+      if (inputGains.length === 1 && inputGains[0] === 1 && duckGain === 1.0) {
+        cb(null, primaryChunk);
+        return;
+      }
+
+      const result = Buffer.allocUnsafe(primaryChunk.length);
+      for (let i = 0; i + 1 < primaryChunk.length; i += 2) {
+        const g0 = priorityMask[0] ? inputGains[0] : inputGains[0] * duckGain;
+        let sum =
+          g0 === 1
+            ? primaryChunk.readInt16LE(i)
+            : Math.round(primaryChunk.readInt16LE(i) * g0);
+
+        for (let s = 0; s < latestSecondaryChunks.length; s++) {
+          const secBuf = latestSecondaryChunks[s];
+          if (secBuf && i + 1 < secBuf.length) {
+            const gs = priorityMask[s + 1]
+              ? inputGains[s + 1]
+              : inputGains[s + 1] * duckGain;
+            sum +=
+              gs === 1
+                ? secBuf.readInt16LE(i)
+                : Math.round(secBuf.readInt16LE(i) * gs);
+          }
+        }
+
+        result.writeInt16LE(Math.max(-32768, Math.min(32767, sum)), i);
+      }
+      cb(null, result);
+    },
   });
+
+  const primaryInput: AnyInputStream = isApp(inputConfigs[0])
+    ? new AppCaptureReadable(inputConfigs[0].appPid!, channels)
+    : new AudioIO(makeInOptions(routingInputIds[0]));
 
   const output = new AudioIO({
     outOptions: {
@@ -163,15 +299,34 @@ export function createTunnel(
     } as AudioIOOptions,
   });
 
-  const { transform: monitor, setMuted } = createMonitor(tunnelId, (level) => {
+  const { transform: monitor, setMuted, setGain } = createMonitor(tunnelId, (level) => {
     levelEmitter.emit("level", tunnelId, level);
   });
 
-  // Attach error handlers before starting — an unhandled 'error' event on a
-  // Node stream crashes the process. Cast to EventEmitter because naudiodon's
-  // typings omit the EventEmitter methods despite AudioIO extending stream.
-  (input as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
-    console.error(`[tunnel:${tunnelId}] input error:`, err.message);
+  // Wire up secondary inputs — each feeds its latest chunk into the mixer buffer.
+  // Secondary failures are non-fatal: the slot stays null (silence) and the
+  // primary + other secondaries continue routing.
+  const secondaryInputs: AnyInputStream[] = [];
+  for (let i = 1; i < inputConfigs.length; i++) {
+    const secInput: AnyInputStream = isApp(inputConfigs[i])
+      ? new AppCaptureReadable(inputConfigs[i].appPid!, channels)
+      : new AudioIO(makeInOptions(routingInputIds[i]));
+    const secIndex = i - 1;
+    const sink = new Writable({
+      write(chunk: Buffer, _, done) {
+        latestSecondaryChunks[secIndex] = chunk;
+        done();
+      },
+    });
+    (secInput as unknown as NodeJS.ReadableStream).pipe(sink);
+    (secInput as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
+      console.error(`[tunnel:${tunnelId}] secondary input ${i} error:`, err.message);
+    });
+    secondaryInputs.push(secInput);
+  }
+
+  (primaryInput as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
+    console.error(`[tunnel:${tunnelId}] primary input error:`, err.message);
     destroyTunnel(tunnelId);
   });
   (output as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
@@ -179,21 +334,57 @@ export function createTunnel(
     destroyTunnel(tunnelId);
   });
 
-  // naudiodon's typings don't satisfy Node's stream interfaces, so we cast
-  // both ends to insert the Transform monitor in between.
-  (input as unknown as NodeJS.ReadableStream)
+  (primaryInput as unknown as NodeJS.ReadableStream)
+    .pipe(mixerTransform)
     .pipe(monitor)
     .pipe(output as unknown as NodeJS.WritableStream);
+
   output.start();
-  input.start();
+  for (const sec of secondaryInputs) {
+    (sec as unknown as { start(): void }).start();
+  }
+  (primaryInput as unknown as { start(): void }).start();
+
+  // Store original (pre-resolve) device IDs so reloadAllTunnels can re-resolve
+  // them correctly if device IDs shift after a rescan.
+  const storedInputConfigs: InputConfig[] = inputConfigs.map((c, i) => ({
+    deviceId: c.deviceId,
+    appPid: c.appPid,
+    gain: inputGains[i],
+    priority: priorityMask[i],
+  }));
 
   activeTunnels.set(tunnelId, {
-    input,
+    primaryInput,
+    secondaryInputs,
     output,
-    inputDeviceId,
+    inputConfigs: storedInputConfigs,
     outputDeviceId,
     sampleRate,
+    channelCount: channels,
+    duckingConfig: { ...ducking },
     setMuted,
+    setGain,
+    setInputGain: (index: number, gain: number) => {
+      if (index < inputGains.length) {
+        inputGains[index] = gain;
+        storedInputConfigs[index].gain = gain;
+      }
+    },
+    setInputPriority: (index: number, priority: boolean) => {
+      if (index < priorityMask.length) {
+        priorityMask[index] = priority;
+        storedInputConfigs[index].priority = priority;
+      }
+    },
+    setDucking: (cfg: DuckingConfig) => {
+      duckEnabled = cfg.enabled;
+      duckAmount = cfg.amount;
+      duckReleaseMs = cfg.release;
+      // Reset smoothed gain when disabling so it doesn't linger at a reduced value.
+      if (!cfg.enabled) duckGain = 1.0;
+      activeTunnels.get(tunnelId)!.duckingConfig = { ...cfg };
+    },
   });
 }
 
@@ -203,7 +394,8 @@ export function destroyTunnel(tunnelId: string): void {
   activeTunnels.delete(tunnelId);
   // Emit zero so the UI meter drops back to zero immediately
   levelEmitter.emit("level", tunnelId, 0);
-  tryQuit(pair.input);
+  for (const sec of pair.secondaryInputs) tryQuit(sec);
+  tryQuit(pair.primaryInput);
   tryQuit(pair.output);
 }
 
@@ -211,8 +403,36 @@ export function getTunnelSampleRate(tunnelId: string): number | null {
   return activeTunnels.get(tunnelId)?.sampleRate ?? null;
 }
 
+export function getTunnelChannelCount(tunnelId: string): number | null {
+  return activeTunnels.get(tunnelId)?.channelCount ?? null;
+}
+
 export function setTunnelMuted(tunnelId: string, muted: boolean): void {
   activeTunnels.get(tunnelId)?.setMuted(muted);
+}
+
+export function setTunnelGain(tunnelId: string, gain: number): void {
+  activeTunnels.get(tunnelId)?.setGain(gain);
+}
+
+export function setTunnelInputGain(
+  tunnelId: string,
+  inputIndex: number,
+  gain: number,
+): void {
+  activeTunnels.get(tunnelId)?.setInputGain(inputIndex, gain);
+}
+
+export function setTunnelInputPriority(
+  tunnelId: string,
+  inputIndex: number,
+  priority: boolean,
+): void {
+  activeTunnels.get(tunnelId)?.setInputPriority(inputIndex, priority);
+}
+
+export function setTunnelDucking(tunnelId: string, cfg: DuckingConfig): void {
+  activeTunnels.get(tunnelId)?.setDucking(cfg);
 }
 
 export function destroyAllTunnels(): void {
@@ -223,10 +443,12 @@ export function destroyAllTunnels(): void {
 export function reloadAllTunnels(framesPerBuffer: number): void {
   const snapshot = [...activeTunnels.entries()].map(([id, pair]) => ({
     id,
-    inputDeviceId: pair.inputDeviceId,
+    inputConfigs: pair.inputConfigs,
     outputDeviceId: pair.outputDeviceId,
+    channelCount: pair.channelCount,
+    duckingConfig: pair.duckingConfig,
   }));
-  for (const { id, inputDeviceId, outputDeviceId } of snapshot) {
-    createTunnel(id, inputDeviceId, outputDeviceId, framesPerBuffer);
+  for (const { id, inputConfigs, outputDeviceId, channelCount, duckingConfig } of snapshot) {
+    createTunnel(id, inputConfigs, outputDeviceId, framesPerBuffer, channelCount, duckingConfig);
   }
 }

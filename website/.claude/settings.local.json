@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const l = require\\('./node_modules/lucide-react/dist/cjs/lucide-react.js'\\); console.log\\(Object.keys\\(l\\).filter\\(k => k.toLowerCase\\(\\).includes\\('git'\\)\\)\\)\")",
+      "Bash(node -e \"import\\('./node_modules/lucide-react/dist/esm/lucide-react.js'\\).then\\(l => console.log\\(Object.keys\\(l\\).filter\\(k => k.toLowerCase\\(\\).includes\\('git'\\)\\)\\)\\)\")",
+      "Bash(npm install:*)",
+      "Bash(node:*)"
+    ]
+  }
+}
