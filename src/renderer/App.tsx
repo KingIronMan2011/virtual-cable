@@ -77,6 +77,22 @@ export default function App() {
     window.electronAPI.saveTunnels(tunnels);
   }, [tunnels]);
 
+  // Poll for newly started audio apps every 3 s so the user doesn't need to restart.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const apps = await window.electronAPI.getAudioApps();
+      setAudioApps((prev) => {
+        if (
+          prev.length === apps.length &&
+          prev.every((p, i) => p.pid === apps[i].pid)
+        )
+          return prev;
+        return apps;
+      });
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
+
   const addTunnel = useCallback(() => {
     setTunnels((prev) => {
       const n = prev.length + 1;

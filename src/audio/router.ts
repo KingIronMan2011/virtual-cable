@@ -224,15 +224,51 @@ export function createTunnel(
   // Smoothed gain applied to non-priority inputs (1.0 = fully open, duckAmount = fully ducked).
   let duckGain = 1.0;
 
-  // Mixer Transform: driven by primary input chunks.
-  // Secondary inputs store their latest chunk; the mixer reads whatever
-  // they last produced (or silence if they haven't produced yet).
-  const latestSecondaryChunks: (Buffer | null)[] = new Array(
+  // Per-secondary FIFO queues.
+  // Decouples chunk sizes between primary (e.g. mic at ~10 ms) and secondary
+  // (e.g. app capture at ~100 ms) so the mixer always advances through secondary
+  // audio at the correct rate rather than replaying the same buffer repeatedly.
+  const secQueues: Buffer[][] = Array.from(
+    { length: Math.max(0, inputConfigs.length - 1) },
+    () => [],
+  );
+  const secQueueBytes: number[] = new Array(
     Math.max(0, inputConfigs.length - 1),
-  ).fill(null);
+  ).fill(0);
+  // Cap each secondary queue at ~200 ms to prevent unbounded growth.
+  const MAX_SEC_BYTES = Math.ceil(sampleRate * channels * 2 * 0.2);
+
+  // Drain `needed` bytes from secondary queue `qi`, zero-padding if empty.
+  function drainSecondary(qi: number, needed: number): Buffer {
+    if (secQueueBytes[qi] === 0) return Buffer.alloc(needed, 0);
+    const out = Buffer.allocUnsafe(needed);
+    let written = 0;
+    const q = secQueues[qi];
+    while (written < needed && q.length > 0) {
+      const head = q[0];
+      const take = Math.min(needed - written, head.length);
+      head.copy(out, written, 0, take);
+      written += take;
+      secQueueBytes[qi] -= take;
+      if (take === head.length) {
+        q.shift();
+      } else {
+        q[0] = head.subarray(take);
+      }
+    }
+    if (written < needed) out.fill(0, written);
+    return out;
+  }
 
   const mixerTransform = new Transform({
     transform(primaryChunk: Buffer, _enc, cb) {
+      // Drain exactly primaryChunk.length bytes from each secondary queue.
+      // This advances each secondary stream in lock-step with the primary,
+      // regardless of how large each source's individual chunks are.
+      const secBuffers = secQueues.map((_, qi) =>
+        drainSecondary(qi, primaryChunk.length),
+      );
+
       // Ducking: determine whether any priority input is above threshold this chunk.
       const hasPriority = priorityMask.some((p) => p);
       const hasNonPriority = priorityMask.some((p) => !p);
@@ -244,9 +280,11 @@ export function createTunnel(
           shouldDuck = true;
         }
         if (!shouldDuck) {
-          for (let s = 0; s < latestSecondaryChunks.length; s++) {
-            const buf = latestSecondaryChunks[s];
-            if (buf && priorityMask[s + 1] && rmsLevel(buf) > DUCK_THRESHOLD) {
+          for (let s = 0; s < secBuffers.length; s++) {
+            if (
+              priorityMask[s + 1] &&
+              rmsLevel(secBuffers[s]) > DUCK_THRESHOLD
+            ) {
               shouldDuck = true;
               break;
             }
@@ -281,17 +319,14 @@ export function createTunnel(
             ? primaryChunk.readInt16LE(i)
             : Math.round(primaryChunk.readInt16LE(i) * g0);
 
-        for (let s = 0; s < latestSecondaryChunks.length; s++) {
-          const secBuf = latestSecondaryChunks[s];
-          if (secBuf && i + 1 < secBuf.length) {
-            const gs = priorityMask[s + 1]
-              ? inputGains[s + 1]
-              : inputGains[s + 1] * duckGain;
-            sum +=
-              gs === 1
-                ? secBuf.readInt16LE(i)
-                : Math.round(secBuf.readInt16LE(i) * gs);
-          }
+        for (let s = 0; s < secBuffers.length; s++) {
+          const gs = priorityMask[s + 1]
+            ? inputGains[s + 1]
+            : inputGains[s + 1] * duckGain;
+          sum +=
+            gs === 1
+              ? secBuffers[s].readInt16LE(i)
+              : Math.round(secBuffers[s].readInt16LE(i) * gs);
         }
 
         result.writeInt16LE(Math.max(-32768, Math.min(32767, sum)), i);
@@ -334,7 +369,16 @@ export function createTunnel(
     const secIndex = i - 1;
     const sink = new Writable({
       write(chunk: Buffer, _, done) {
-        latestSecondaryChunks[secIndex] = chunk;
+        secQueues[secIndex].push(chunk);
+        secQueueBytes[secIndex] += chunk.length;
+        // If the queue grows beyond ~200 ms, drop the oldest chunk to stay
+        // in sync rather than accumulating unbounded delay.
+        while (
+          secQueueBytes[secIndex] > MAX_SEC_BYTES &&
+          secQueues[secIndex].length > 0
+        ) {
+          secQueueBytes[secIndex] -= secQueues[secIndex].shift()!.length;
+        }
         done();
       },
     });

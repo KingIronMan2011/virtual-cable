@@ -433,17 +433,29 @@ static void CaptureLoop(CaptureCtx* ctx) {
       } else if (isFloat) {
         const float* src = reinterpret_cast<const float*>(pData);
         for (UINT32 f = 0; f < numFrames; f++) {
-          for (WORD c = 0; c < outCh; c++) {
-            WORD srcCh = (c < sysCh) ? c : (WORD)(sysCh - 1);
-            chunk->samples[f * outCh + c] = f32ToI16(src[f * sysCh + srcCh]);
+          if (outCh == 1 && sysCh >= 2) {
+            /* Stereo-to-mono: average L+R to preserve all audio content. */
+            float mixed = (src[f * sysCh + 0] + src[f * sysCh + 1]) * 0.5f;
+            chunk->samples[f] = f32ToI16(mixed);
+          } else {
+            for (WORD c = 0; c < outCh; c++) {
+              WORD srcCh = (c < sysCh) ? c : (WORD)(sysCh - 1);
+              chunk->samples[f * outCh + c] = f32ToI16(src[f * sysCh + srcCh]);
+            }
           }
         }
       } else if (isPCM && sysBits == 16) {
         const int16_t* src = reinterpret_cast<const int16_t*>(pData);
         for (UINT32 f = 0; f < numFrames; f++) {
-          for (WORD c = 0; c < outCh; c++) {
-            WORD srcCh = (c < sysCh) ? c : (WORD)(sysCh - 1);
-            chunk->samples[f * outCh + c] = src[f * sysCh + srcCh];
+          if (outCh == 1 && sysCh >= 2) {
+            /* Stereo-to-mono: average L+R (use int32 to avoid overflow). */
+            int32_t mixed = ((int32_t)src[f * sysCh + 0] + (int32_t)src[f * sysCh + 1]) >> 1;
+            chunk->samples[f] = (int16_t)mixed;
+          } else {
+            for (WORD c = 0; c < outCh; c++) {
+              WORD srcCh = (c < sysCh) ? c : (WORD)(sysCh - 1);
+              chunk->samples[f * outCh + c] = src[f * sysCh + srcCh];
+            }
           }
         }
       } else {

@@ -29,7 +29,8 @@
       "Bash(npx node-gyp:*)",
       "Bash(grep -v \"^$\")",
       "Bash(taskkill /F /IM electron.exe)",
-      "Bash(taskkill /F /IM \"virtual-cable.exe\")"
+      "Bash(taskkill /F /IM \"virtual-cable.exe\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts', {}\\), indent=2\\)\\)\")"
     ]
   }
 }

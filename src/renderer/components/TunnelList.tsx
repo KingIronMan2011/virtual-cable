@@ -66,8 +66,18 @@ export default function TunnelList({
         <div
           key={tunnel.id}
           draggable
+          onPointerDown={(e) => {
+            // Disable draggable before the browser can start a drag gesture
+            // on range inputs — otherwise the card reorders instead of sliding.
+            if ((e.target as HTMLElement).closest('input[type="range"]')) {
+              e.currentTarget.draggable = false;
+            }
+          }}
+          onPointerUp={(e) => {
+            e.currentTarget.draggable = true;
+          }}
           onDragStart={(e) => {
-            // Don't hijack drags that originate from interactive controls
+            // Fallback guard for other interactive controls (select, button)
             const t = e.target as HTMLElement;
             if (t.closest("select, input, button")) {
               e.preventDefault();

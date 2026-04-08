@@ -44,7 +44,17 @@ export interface AudioApp {
 }
 
 export function listAudioApps(): AudioApp[] {
-  return getAddon()?.listAudioApps() ?? [];
+  const apps = getAddon()?.listAudioApps() ?? [];
+  // Deduplicate by exe name (case-insensitive).
+  // Apps like Discord spawn several same-named processes that each register an
+  // audio session; keep only the first (lowest PID) entry per executable.
+  const seen = new Set<string>();
+  return apps.filter((a) => {
+    const key = a.exe.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /* ── AppCaptureReadable ───────────────────────────────────────────────── */

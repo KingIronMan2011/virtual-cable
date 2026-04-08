@@ -220,7 +220,6 @@ body::after {
     0 4px 32px color-mix(in srgb, var(--color-active) 6%, transparent);
 }
 
-/* Card header row */
 .cable-drag-wrapper {
   transition: opacity 0.15s;
 }
@@ -234,6 +233,7 @@ body::after {
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
+/* ── Card header ── */
 .card-head {
   display: flex;
   align-items: center;
@@ -315,31 +315,49 @@ body::after {
   background: color-mix(in srgb, #e05555 10%, transparent);
 }
 
-/* Routing row: [inputs column] [cable connector] [output column] */
-.routing-row {
+/* ── I/O routing row: [inputs column] [cable connector] [output column] ── */
+.io-row {
   display: grid;
-  grid-template-columns: 1fr 52px 1fr;
+  grid-template-columns: 1fr 80px 1fr;
   align-items: start;
   column-gap: 8px;
   margin-bottom: 14px;
 }
 
-.inputs-group {
+.io-col {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
-/* Individual input row: [select] [gain slider] [dB] [remove] */
+.io-label {
+  font-size: 0.58rem;
+  font-weight: 300;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+}
+
+.io-meta {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+}
+
+/* Wrapper around all input-row items — provides vertical spacing between them */
+.input-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Individual input row: [select] [gain slider] [dB] [priority] [remove] */
 .input-row {
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-.input-row-select {
-  flex: 1;
-  min-width: 0;
 }
 
 .input-gain-slider {
@@ -378,22 +396,23 @@ body::after {
   cursor: pointer;
 }
 
-.input-gain-db {
+/* Shared gain value label — used for per-input gain and master gain */
+.gain-val {
   font-family: var(--font-mono);
   font-size: 0.52rem;
   color: var(--color-muted);
   flex-shrink: 0;
-  width: 34px;
-  text-align: right;
   white-space: nowrap;
+  text-align: right;
   transition: color 0.15s;
 }
 
-.input-gain-db.is-adjusted {
+.gain-val.is-adjusted {
   color: var(--color-accent);
 }
 
-.input-remove-btn {
+/* Shared icon button — priority star + remove X */
+.icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -409,31 +428,11 @@ body::after {
   transition: color 0.15s;
 }
 
-.input-remove-btn:hover {
-  color: #e05555;
+.icon-btn:hover {
+  color: var(--color-muted);
 }
 
-.input-priority-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: var(--color-border-hi);
-  cursor: pointer;
-  border-radius: 2px;
-  padding: 0;
-  transition: color 0.15s;
-}
-
-.input-priority-btn:hover {
-  color: var(--color-accent);
-}
-
-.input-priority-btn.is-active {
+.icon-btn.is-priority {
   color: var(--color-accent);
 }
 
@@ -460,21 +459,6 @@ body::after {
 .add-input-btn:hover {
   color: var(--color-active);
   border-color: var(--color-active);
-}
-
-.device-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.device-label {
-  font-size: 0.58rem;
-  font-weight: 300;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-accent);
-  font-family: var(--font-mono);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -514,112 +498,90 @@ body::after {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Cable Connector
+   Cable Connector — SVG topology (N inputs → bezier merge → output)
 ───────────────────────────────────────────────────────────────── */
+
+/* Wrapper stretches to the full grid-cell height. position:relative so the
+   absolutely-positioned SVG can overlay it without inflating the grid row. */
 .cable-connector {
-  display: flex;
-  align-items: center;
-  align-self: center;
-  gap: 0;
+  align-self: stretch;
   width: 100%;
-}
-
-.cable-jack {
-  flex-shrink: 0;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--color-border-hi);
-  transition:
-    background 0.3s,
-    box-shadow 0.3s;
-}
-
-.cable-jack.is-active {
-  background: var(--color-active);
-  box-shadow:
-    0 0 7px var(--color-active),
-    0 0 2px var(--color-active);
-}
-
-.cable-track {
-  flex: 1;
-  height: 1.5px;
-  background: var(--color-border);
   position: relative;
-  overflow: hidden;
-  border-radius: 1px;
-  margin: 0 2px;
-  transition: background 0.3s;
 }
 
-.cable-track.is-active {
-  background: color-mix(in srgb, var(--color-active) 22%, transparent);
+/* Right io-col floats to vertical center so the output select
+   stays level with the cable's output jack (always at y = 50%). */
+.io-col--out {
+  align-self: center;
 }
 
-/* The animated signal pulse */
-.cable-pulse {
+.cable-svg {
+  display: block;
   position: absolute;
   top: 0;
-  left: -65%;
-  width: 65%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--color-active) 50%,
-    transparent 100%
-  );
-  animation: pulse-travel 1.25s linear infinite;
+  left: 0;
+  overflow: visible;
 }
 
-@keyframes pulse-travel {
+/* Branch curves and output track */
+.c-branch {
+  stroke: var(--color-border-hi);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.3s;
+}
+.c-branch.is-active {
+  stroke: color-mix(in srgb, var(--color-active) 45%, var(--color-border-hi));
+}
+
+/* Jack circles (input ends + junction dot + output end) */
+.c-jack {
+  fill: var(--color-border-hi);
+  transition:
+    fill 0.3s,
+    filter 0.3s;
+}
+.c-jack.is-active {
+  fill: var(--color-active);
+  filter: drop-shadow(0 0 3px var(--color-active));
+}
+
+/* Animated pulse travelling along the output segment */
+.c-pulse {
+  stroke: var(--color-active);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 18 100;
+  animation: svg-pulse 1.25s linear infinite;
+}
+
+@keyframes svg-pulse {
   from {
-    left: -65%;
+    stroke-dashoffset: 118;
   }
   to {
-    left: 140%;
+    stroke-dashoffset: -118;
   }
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   VU Meter
+   Controls row: channel picker · master gain
 ───────────────────────────────────────────────────────────────── */
-.card-sample-rate {
-  grid-column: 2;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--color-muted);
-  letter-spacing: 0.04em;
-  text-align: center;
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   Channel picker
-───────────────────────────────────────────────────────────────── */
-.channel-row {
+.controls-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 8px 0 4px;
 }
 
-.channel-label {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  color: var(--color-muted);
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-.channel-options {
+.ch-picker {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
 }
 
-.channel-btn {
+.ch-btn {
   font-family: var(--font-mono);
   font-size: 0.6rem;
   padding: 2px 8px;
@@ -635,151 +597,27 @@ body::after {
     background 0.15s;
 }
 
-.channel-btn:hover {
+.ch-btn:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
 
-.channel-btn.is-active {
+.ch-btn.is-active {
   border-color: var(--color-active);
   color: var(--color-active);
   background: rgba(61 214 200 / 0.08);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   Ducking
-───────────────────────────────────────────────────────────────── */
-.ducking-row {
+/* Gain control: slider + value label */
+.gain-ctrl {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 2px;
-}
-
-.ducking-label {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.08em;
-  color: var(--color-muted);
-  text-transform: uppercase;
   flex-shrink: 0;
-  width: 52px;
-}
-
-.ducking-toggle {
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-  background: none;
-  border: 1px solid var(--color-border-hi);
-  color: var(--color-muted);
-  border-radius: 3px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-
-.ducking-toggle:hover {
-  color: var(--color-text);
-  border-color: var(--color-muted);
-}
-
-.ducking-toggle.is-active {
-  color: var(--color-active);
-  border-color: var(--color-active);
-}
-
-.ducking-sub-label {
-  font-family: var(--font-mono);
-  font-size: 0.5rem;
-  letter-spacing: 0.06em;
-  color: var(--color-muted);
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-.ducking-slider,
-.ducking-release-slider {
-  height: 2px;
-  background: var(--color-border-hi);
-  border-radius: 1px;
-  outline: none;
-  -webkit-appearance: none;
-  cursor: pointer;
-}
-
-.ducking-slider {
-  width: 52px;
-  flex-shrink: 0;
-}
-
-.ducking-release-slider {
-  width: 60px;
-  flex-shrink: 0;
-}
-
-.ducking-slider::-webkit-slider-thumb,
-.ducking-release-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-muted);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.ducking-slider:hover::-webkit-slider-thumb,
-.ducking-release-slider:hover::-webkit-slider-thumb {
-  background: var(--color-active);
-}
-
-.ducking-amt-db {
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  color: var(--color-active);
-  width: 28px;
-  text-align: right;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.ducking-release-val {
-  font-family: var(--font-mono);
-  font-size: 0.52rem;
-  color: var(--color-muted);
-  width: 34px;
-  text-align: right;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   Gain slider
-───────────────────────────────────────────────────────────────── */
-.gain-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 6px 0 4px;
-}
-
-.gain-label {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  color: var(--color-muted);
-  text-transform: uppercase;
-  flex-shrink: 0;
-  width: 34px;
 }
 
 .gain-slider {
-  flex: 1;
+  width: 80px;
   -webkit-appearance: none;
   appearance: none;
   height: 3px;
@@ -816,20 +654,84 @@ body::after {
   cursor: pointer;
 }
 
-.gain-db {
+/* ─────────────────────────────────────────────────────────────────
+   Ducking
+───────────────────────────────────────────────────────────────── */
+.ducking-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.duck-toggle {
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid var(--color-border-hi);
   color: var(--color-muted);
+  border-radius: 3px;
+  cursor: pointer;
   flex-shrink: 0;
-  width: 56px;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.duck-toggle:hover {
+  color: var(--color-text);
+  border-color: var(--color-muted);
+}
+
+.duck-toggle.is-active {
+  color: var(--color-active);
+  border-color: var(--color-active);
+}
+
+.duck-slider {
+  height: 2px;
+  background: var(--color-border-hi);
+  border-radius: 1px;
+  outline: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.duck-slider--release {
+  width: 60px;
+}
+
+.duck-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.duck-slider:hover::-webkit-slider-thumb {
+  background: var(--color-active);
+}
+
+.duck-val {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
   text-align: right;
-  transition: color 0.15s;
 }
 
-.gain-db.is-adjusted {
-  color: var(--color-accent);
-}
-
+/* ─────────────────────────────────────────────────────────────────
+   VU Meter
+───────────────────────────────────────────────────────────────── */
 .vu-meter {
   height: 4px;
   border-radius: 2px;
@@ -855,7 +757,7 @@ body::after {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Toggle Button
+   Card footer: toggle + mute
 ───────────────────────────────────────────────────────────────── */
 .card-foot {
   display: flex;
@@ -907,9 +809,6 @@ body::after {
     inset 0 0 12px color-mix(in srgb, var(--color-active) 5%, transparent);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   Mute Button
-───────────────────────────────────────────────────────────────── */
 .cable-mute {
   width: 28px;
   height: 28px;
@@ -1275,7 +1174,7 @@ body::after {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Header settings button
+   Header buttons
 ───────────────────────────────────────────────────────────────── */
 .header-rescan-btn {
   background: none;

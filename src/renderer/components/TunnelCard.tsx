@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   GripVertical,
   Plus,
@@ -9,7 +9,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import type { AudioDevice, Tunnel, TunnelInput } from "../../types";
+import type { AudioDevice, Tunnel } from "../../types";
 
 interface Props {
   tunnel: Tunnel;
@@ -36,6 +36,11 @@ interface Props {
   expSampleRate: boolean;
 }
 
+function dbLabel(gain: number, decimals = 1) {
+  if (gain === 0) return "−∞";
+  return `${gain >= 1 ? "+" : ""}${(20 * Math.log10(gain)).toFixed(decimals)}`;
+}
+
 export default function TunnelCard({
   tunnel,
   devices,
@@ -54,27 +59,46 @@ export default function TunnelCard({
   const inputDevices = devices.filter((d) => d.maxInputChannels > 0);
   const outputDevices = devices.filter((d) => d.maxOutputChannels > 0);
 
-  // Cable can activate when every input slot has either a device or an app selected
+  const maxCh =
+    outputDevices.find((d) => d.id === tunnel.outputDeviceId)
+      ?.maxOutputChannels ?? 8;
+  const channelOptions = [1, 2, 4, 6, 8].filter((n) => n <= maxCh);
+
   const canActivate =
-    tunnel.inputs.length > 0 &&
-    tunnel.inputs.every(
-      (inp) => inp.deviceId !== null || inp.appPid !== null,
-    ) &&
+    tunnel.inputs.some((inp) => inp.deviceId !== null || inp.appPid !== null) &&
     tunnel.outputDeviceId !== null;
 
-  // Channel count: limited by primary input + output capabilities
-  const primaryInput = devices.find((d) => d.id === tunnel.inputs[0]?.deviceId);
-  const selectedOutput = devices.find((d) => d.id === tunnel.outputDeviceId);
-  const maxChannels =
-    primaryInput && selectedOutput
-      ? Math.min(
-          primaryInput.maxInputChannels,
-          selectedOutput.maxOutputChannels,
-        )
-      : 8;
-  const channelOptions = [1, 2, 4, 6, 8].filter((n) => n <= maxChannels);
-
   const vuBarRef = useRef<HTMLDivElement>(null);
+  const cableRef = useRef<HTMLDivElement>(null);
+  const inputRowsRef = useRef<HTMLDivElement>(null);
+  // Pixel-accurate bounds of the input-rows area within the cable column.
+  // The output jack is always placed at (top + bot) / 2 — the vertical midpoint
+  // of all input jacks — so for 2 inputs it falls between them, for 3 on the middle one, etc.
+  const [cableH, setCableH] = useState(48);
+  const [anchors, setAnchors] = useState({ top: 0, bot: 48 });
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const cable = cableRef.current;
+      if (!cable) return;
+      const cr = cable.getBoundingClientRect();
+      setCableH(Math.round(cr.height));
+      let top = 0,
+        bot = cr.height;
+      const rows = inputRowsRef.current;
+      if (rows) {
+        const rr = rows.getBoundingClientRect();
+        top = rr.top - cr.top;
+        bot = rr.bottom - cr.top;
+      }
+      setAnchors({ top, bot });
+    };
+    measure();
+    const obs = new ResizeObserver(measure);
+    if (cableRef.current) obs.observe(cableRef.current);
+    return () => obs.disconnect();
+  }, [tunnel.inputs.length]);
+
   const [sampleRate, setSampleRate] = useState<number | null>(null);
   const [activeChannelCount, setActiveChannelCount] = useState<number | null>(
     null,
@@ -83,7 +107,7 @@ export default function TunnelCard({
   const [editName, setEditName] = useState(tunnel.name);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // VU meter — direct DOM writes, no re-renders
+  // VU meter — direct DOM writes to avoid re-renders on every audio frame
   useEffect(() => {
     if (!vuBarRef.current) return;
     if (!tunnel.active) {
@@ -120,7 +144,6 @@ export default function TunnelCard({
     };
   }, [tunnel.active, tunnel.id, expSampleRate]);
 
-  // Auto-focus the name input when entering edit mode
   useEffect(() => {
     if (editing) {
       nameInputRef.current?.focus();
@@ -140,17 +163,14 @@ export default function TunnelCard({
     setEditName(tunnel.name);
   };
 
-  // Deactivating tunnel-level changes (devices, channels, inputs list)
-  const set = (patch: Partial<Tunnel>) => {
+  // Any structural change (device, channel count, inputs) deactivates the tunnel
+  const set = (patch: Partial<Tunnel>) =>
     onUpdate({ ...tunnel, ...patch, active: false });
-  };
 
-  const setOutputDevice = (deviceId: number | null) => {
+  const setOutputDevice = (deviceId: number | null) =>
     onUpdate({ ...tunnel, outputDeviceId: deviceId, active: false });
-  };
 
-  // Value encoding: "d:<deviceId>" for devices, "a:<pid>" for apps, "" for none.
-  const inputSelectValue = (inp: TunnelInput): string => {
+  const inputSelectValue = (inp: (typeof tunnel.inputs)[0]) => {
     if (inp.appPid !== null) return `a:${inp.appPid}`;
     if (inp.deviceId !== null) return `d:${inp.deviceId}`;
     return "";
@@ -167,7 +187,7 @@ export default function TunnelCard({
     onUpdate({ ...tunnel, inputs, active: false });
   };
 
-  const addInput = () => {
+  const addInput = () =>
     onUpdate({
       ...tunnel,
       inputs: [
@@ -176,7 +196,6 @@ export default function TunnelCard({
       ],
       active: false,
     });
-  };
 
   const removeInput = (index: number) => {
     if (tunnel.inputs.length <= 1) return;
@@ -187,15 +206,6 @@ export default function TunnelCard({
     });
   };
 
-  const toggleActive = () => {
-    if (!canActivate) return;
-    onToggleActive(tunnel.id);
-  };
-
-  const toggleMute = () => {
-    if (tunnel.active) onToggleMute(tunnel.id);
-  };
-
   const srLabel =
     sampleRate !== null
       ? sampleRate >= 1000
@@ -203,14 +213,14 @@ export default function TunnelCard({
         : `${sampleRate} Hz`
       : null;
 
-  const gainDb =
-    tunnel.gain === 0
-      ? "-∞ dB"
-      : `${tunnel.gain >= 1 ? "+" : ""}${(20 * Math.log10(tunnel.gain)).toFixed(1)} dB`;
+  // Pixel offset from the grid-row centre to the cable's output jack.
+  // Used to translateY the output column so its centre matches the jack exactly.
+  const outputJackY = (anchors.top + anchors.bot) / 2;
+  const outputColShift = outputJackY - cableH / 2;
 
   return (
     <div className={`cable-card${tunnel.active ? " is-active" : ""}`}>
-      {/* Card header */}
+      {/* ── Header: grip · name · delete ── */}
       <div className="card-head">
         <span className="card-grip" title="Drag to reorder">
           <GripVertical size={13} strokeWidth={1.75} />
@@ -242,28 +252,22 @@ export default function TunnelCard({
         <button
           className="card-delete"
           onClick={() => onDelete(tunnel.id)}
-          title="Delete cable"
+          title="Delete"
         >
           <Trash2 size={13} strokeWidth={2} />
         </button>
       </div>
 
-      {/* Routing row: [inputs list] [connector] [output] */}
-      <div className="routing-row">
+      {/* ── I/O routing: inputs · cable · output ── */}
+      <div className="io-row">
         {/* Inputs column */}
-        <div className="inputs-group">
-          <span className="device-label">
-            Input{tunnel.inputs.length > 1 ? `s (${tunnel.inputs.length})` : ""}
-          </span>
-          {tunnel.inputs.map((inp, i) => {
-            const inpGainDb =
-              inp.gain === 0
-                ? "-∞"
-                : `${inp.gain >= 1 ? "+" : ""}${(20 * Math.log10(inp.gain)).toFixed(1)}`;
-            return (
+        <div className="io-col">
+          <span className="io-label">In</span>
+          <div ref={inputRowsRef} className="input-rows">
+            {tunnel.inputs.map((inp, i) => (
               <div key={i} className="input-row">
                 <select
-                  className="device-select input-row-select"
+                  className="device-select"
                   value={inputSelectValue(inp)}
                   onChange={(e) => setInputSource(i, e.target.value)}
                 >
@@ -301,12 +305,12 @@ export default function TunnelCard({
                   title="Per-input gain (double-click to reset)"
                 />
                 <span
-                  className={`input-gain-db${inp.gain !== 1 ? " is-adjusted" : ""}`}
+                  className={`gain-val${inp.gain !== 1 ? " is-adjusted" : ""}`}
                 >
-                  {inpGainDb}
+                  {dbLabel(inp.gain)}
                 </span>
                 <button
-                  className={`input-priority-btn${inp.priority ? " is-active" : ""}`}
+                  className={`icon-btn${inp.priority ? " is-priority" : ""}`}
                   onClick={() =>
                     onSetInputPriority(tunnel.id, i, !inp.priority)
                   }
@@ -324,7 +328,7 @@ export default function TunnelCard({
                 </button>
                 {tunnel.inputs.length > 1 && (
                   <button
-                    className="input-remove-btn"
+                    className="icon-btn"
                     onClick={() => removeInput(i)}
                     title="Remove input"
                   >
@@ -332,26 +336,111 @@ export default function TunnelCard({
                   </button>
                 )}
               </div>
-            );
-          })}
+            ))}
+          </div>
           <button className="add-input-btn" onClick={addInput}>
-            <Plus size={11} strokeWidth={2.5} />
-            Add Input
+            <Plus size={11} strokeWidth={2.5} /> Add
           </button>
         </div>
 
-        {/* Animated cable connector */}
-        <div className="cable-connector">
-          <div className={`cable-jack${tunnel.active ? " is-active" : ""}`} />
-          <div className={`cable-track${tunnel.active ? " is-active" : ""}`}>
-            {tunnel.active && <div className="cable-pulse" />}
-          </div>
-          <div className={`cable-jack${tunnel.active ? " is-active" : ""}`} />
+        {/* Cable topology — SVG bezier curves: N inputs → smooth merge → output */}
+        <div ref={cableRef} className="cable-connector">
+          {(() => {
+            const n = tunnel.inputs.length;
+            const act = tunnel.active;
+            // Real pixel coordinates derived from measured DOM positions so jacks
+            // align with the actual select/label elements, not the full grid row.
+            const W = 80,
+              H = cableH;
+            const jx = 12,
+              bx = 40,
+              ox = 68;
+            const mx = (jx + bx) / 2; // bezier control-point x
+            const span = anchors.bot - anchors.top;
+            const ys = Array.from(
+              { length: n },
+              (_, i) => anchors.top + ((2 * i + 1) / (2 * n)) * span,
+            );
+            // Output jack sits at the vertical midpoint of all input jacks:
+            // midpoint of 2 → between them; midpoint of 3 → on the middle one; etc.
+            const oy = (anchors.top + anchors.bot) / 2;
+            return (
+              <svg
+                viewBox={`0 0 ${W} ${H}`}
+                width={W}
+                height={H}
+                className="cable-svg"
+              >
+                {/* Branch curves: each input bezier-curves into the central junction */}
+                {ys.map((iy, i) => (
+                  <path
+                    key={i}
+                    d={
+                      n === 1
+                        ? `M ${jx} ${oy} L ${ox} ${oy}`
+                        : `M ${jx} ${iy} C ${mx} ${iy} ${mx} ${oy} ${bx} ${oy}`
+                    }
+                    fill="none"
+                    className={`c-branch${act ? " is-active" : ""}`}
+                  />
+                ))}
+                {/* Output track (multi-input only; single reuses the branch path) */}
+                {n > 1 && (
+                  <line
+                    x1={bx}
+                    y1={oy}
+                    x2={ox}
+                    y2={oy}
+                    className={`c-branch${act ? " is-active" : ""}`}
+                  />
+                )}
+                {/* Animated pulse travelling along the output segment */}
+                {act && (
+                  <line
+                    x1={n > 1 ? bx : jx}
+                    y1={oy}
+                    x2={ox}
+                    y2={oy}
+                    className="c-pulse"
+                  />
+                )}
+                {/* Input jacks */}
+                {ys.map((iy, i) => (
+                  <circle
+                    key={i}
+                    cx={jx}
+                    cy={iy}
+                    r={5}
+                    className={`c-jack${act ? " is-active" : ""}`}
+                  />
+                ))}
+                {/* Junction dot where all branches converge */}
+                {n > 1 && (
+                  <circle
+                    cx={bx}
+                    cy={oy}
+                    r={4}
+                    className={`c-jack${act ? " is-active" : ""}`}
+                  />
+                )}
+                {/* Output jack */}
+                <circle
+                  cx={ox}
+                  cy={oy}
+                  r={5}
+                  className={`c-jack${act ? " is-active" : ""}`}
+                />
+              </svg>
+            );
+          })()}
         </div>
 
-        {/* Output column */}
-        <div className="device-group">
-          <span className="device-label">Output</span>
+        {/* Output column — shifted so its centre aligns with the cable's output jack */}
+        <div
+          className="io-col io-col--out"
+          style={{ transform: `translateY(${outputColShift}px)` }}
+        >
+          <span className="io-label">Out</span>
           <select
             className="device-select"
             value={tunnel.outputDeviceId ?? ""}
@@ -368,23 +457,17 @@ export default function TunnelCard({
               </option>
             ))}
           </select>
-          {expSampleRate && (
-            <span
-              className="card-sample-rate"
-              style={{ visibility: srLabel ? "visible" : "hidden" }}
-            >
-              {srLabel ?? "\u00A0"}
-            </span>
+          {expSampleRate && srLabel && (
+            <span className="io-meta">{srLabel}</span>
           )}
         </div>
       </div>
 
-      {/* Channel count row */}
-      <div className="channel-row">
-        <span className="channel-label">Channels</span>
-        <div className="channel-options">
+      {/* ── Controls: channel picker · cable · master gain ── */}
+      <div className="controls-row">
+        <div className="ch-picker">
           <button
-            className={`channel-btn${tunnel.channelCount === null ? " is-active" : ""}`}
+            className={`ch-btn${tunnel.channelCount === null ? " is-active" : ""}`}
             onClick={() => set({ channelCount: null })}
           >
             Auto
@@ -397,21 +480,38 @@ export default function TunnelCard({
           {channelOptions.map((n) => (
             <button
               key={n}
-              className={`channel-btn${tunnel.channelCount === n ? " is-active" : ""}`}
+              className={`ch-btn${tunnel.channelCount === n ? " is-active" : ""}`}
               onClick={() => set({ channelCount: n })}
             >
               {n === 1 ? "Mono" : n === 2 ? "Stereo" : `${n}ch`}
             </button>
           ))}
         </div>
+        <div className="gain-ctrl">
+          <input
+            className="gain-slider"
+            type="range"
+            min={0}
+            max={200}
+            step={1}
+            value={Math.round(tunnel.gain * 100)}
+            onChange={(e) => onSetGain(tunnel.id, Number(e.target.value) / 100)}
+            onDoubleClick={() => onSetGain(tunnel.id, 1)}
+            title="Master gain — double-click to reset to 0 dB"
+          />
+          <span
+            className={`gain-val${tunnel.gain !== 1 ? " is-adjusted" : ""}`}
+          >
+            {dbLabel(tunnel.gain)} dB
+          </span>
+        </div>
       </div>
 
-      {/* Ducking section — only when multiple inputs exist */}
+      {/* ── Ducking — only when multiple inputs exist ── */}
       {tunnel.inputs.length > 1 && (
         <div className="ducking-row">
-          <span className="ducking-label">Ducking</span>
           <button
-            className={`ducking-toggle${tunnel.duckingEnabled ? " is-active" : ""}`}
+            className={`duck-toggle${tunnel.duckingEnabled ? " is-active" : ""}`}
             onClick={() =>
               onSetDucking(
                 tunnel.id,
@@ -421,13 +521,12 @@ export default function TunnelCard({
               )
             }
           >
-            {tunnel.duckingEnabled ? "On" : "Off"}
+            Duck
           </button>
           {tunnel.duckingEnabled && (
             <>
-              <span className="ducking-sub-label">Amt</span>
               <input
-                className="ducking-slider"
+                className="duck-slider"
                 type="range"
                 min={0}
                 max={100}
@@ -436,30 +535,24 @@ export default function TunnelCard({
                 onChange={(e) =>
                   onSetDucking(
                     tunnel.id,
-                    tunnel.duckingEnabled,
+                    true,
                     Number(e.target.value) / 100,
                     tunnel.duckingRelease,
                   )
                 }
                 onDoubleClick={() =>
-                  onSetDucking(
-                    tunnel.id,
-                    tunnel.duckingEnabled,
-                    0.15,
-                    tunnel.duckingRelease,
-                  )
+                  onSetDucking(tunnel.id, true, 0.15, tunnel.duckingRelease)
                 }
-                title="How much non-priority inputs are reduced (double-click to reset)"
+                title="Duck amount (double-click to reset)"
               />
-              <span className="ducking-amt-db">
+              <span className="duck-val">
                 {tunnel.duckingAmount === 0
                   ? "−∞"
-                  : `${(20 * Math.log10(tunnel.duckingAmount)).toFixed(0)}`}
+                  : `${(20 * Math.log10(tunnel.duckingAmount)).toFixed(0)}`}{" "}
                 dB
               </span>
-              <span className="ducking-sub-label">Rel</span>
               <input
-                className="ducking-release-slider"
+                className="duck-slider duck-slider--release"
                 type="range"
                 min={50}
                 max={5000}
@@ -468,50 +561,29 @@ export default function TunnelCard({
                 onChange={(e) =>
                   onSetDucking(
                     tunnel.id,
-                    tunnel.duckingEnabled,
+                    true,
                     tunnel.duckingAmount,
                     Number(e.target.value),
                   )
                 }
-                title="Release time — how quickly non-priority inputs recover"
+                title="Release time"
               />
-              <span className="ducking-release-val">
-                {tunnel.duckingRelease}ms
-              </span>
+              <span className="duck-val">{tunnel.duckingRelease} ms</span>
             </>
           )}
         </div>
       )}
 
-      {/* Gain slider */}
-      <div className="gain-row">
-        <span className="gain-label">Gain</span>
-        <input
-          className="gain-slider"
-          type="range"
-          min={0}
-          max={200}
-          step={1}
-          value={Math.round(tunnel.gain * 100)}
-          onChange={(e) => onSetGain(tunnel.id, Number(e.target.value) / 100)}
-          onDoubleClick={() => onSetGain(tunnel.id, 1)}
-          title="Double-click to reset to unity (0 dB)"
-        />
-        <span className={`gain-db${tunnel.gain !== 1 ? " is-adjusted" : ""}`}>
-          {gainDb}
-        </span>
-      </div>
-
-      {/* VU meter */}
+      {/* ── VU meter ── */}
       <div className="vu-meter">
         <div className="vu-bar" ref={vuBarRef} />
       </div>
 
-      {/* Toggle */}
+      {/* ── Footer: toggle + mute ── */}
       <div className="card-foot">
         <button
           className={`cable-toggle${tunnel.active ? " is-active" : ""}`}
-          onClick={toggleActive}
+          onClick={() => onToggleActive(tunnel.id)}
           disabled={!canActivate}
           title={!canActivate ? "Select input and output first" : undefined}
         >
@@ -520,7 +592,9 @@ export default function TunnelCard({
         </button>
         <button
           className={`cable-mute${tunnel.muted ? " is-muted" : ""}`}
-          onClick={toggleMute}
+          onClick={() => {
+            if (tunnel.active) onToggleMute(tunnel.id);
+          }}
           disabled={!tunnel.active}
           title={
             !tunnel.active
