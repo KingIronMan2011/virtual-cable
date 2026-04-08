@@ -10,8 +10,6 @@
  */
 
 import { Readable } from "node:stream";
-import path from "node:path";
-import { app } from "electron";
 
 /* ── Lazy-load the native addon ──────────────────────────────────────── */
 interface NativeAddon {

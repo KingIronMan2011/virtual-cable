@@ -20,7 +20,7 @@ const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
 
 function Header() {
   return (
-    <header className="fixed top-0 inset-x-0 z-50 border-b border-surface-border bg-[#0c0b09]/80 backdrop-blur-md">
+    <header className="fixed top-0 inset-x-0 z-50 border-b border-surface-border bg-bg/80 backdrop-blur-md">
       <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-14">
         <div className="flex items-center gap-2 font-semibold text-white">
           <Cable size={18} className="text-brand" />
@@ -331,7 +331,7 @@ function Footer() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-[#0c0b09] text-white">
+    <div className="min-h-screen bg-bg text-white">
       <Header />
       <main>
         <Hero />

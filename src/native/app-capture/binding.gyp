@@ -2,10 +2,10 @@
   "targets": [
     {
       "target_name": "app-capture",
-      "sources": ["appCapture.cc"],
       "msvs_configuration_platform": "x64",
       "conditions": [
         ["OS=='win'", {
+          "sources": ["appCapture.cc"],
           "libraries": ["-lole32", "-loleaut32", "-lmmdevapi", "-lruntimeobject"],
           "msvs_settings": {
             "VCCLCompilerTool": {
@@ -18,6 +18,8 @@
               "PlatformToolset": "v143"
             }
           }
+        }, {
+          "sources": ["appCaptureStub.cc"]
         }]
       ]
     }

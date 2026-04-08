@@ -97,7 +97,7 @@ jobs:
         run: npm ci
 
       - name: Rebuild native addons for arm64
-        run: npx electron-rebuild -f -w naudiodon,segfault-handler --arch arm64
+        run: npx electron-rebuild -f -w naudiodon,segfault-handler,app-capture --arch arm64
 
       - name: Build icons
         run: npm run build:icons

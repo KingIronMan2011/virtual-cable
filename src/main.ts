@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, dialog } from "electron";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { existsSync, writeFileSync, readFileSync } from "node:fs";
 import { getAudioDevices } from "./audio/devices";
 import { listAudioApps } from "./audio/appCapture";
@@ -39,38 +38,6 @@ import type { AppSettings } from "./store/settingsStore";
 // ── Squirrel install / uninstall (Windows only) ───────────────────────────────
 // Squirrel launches the app briefly with a special arg to create/remove shortcuts.
 // We handle it here so we can fire analytics before exiting.
-async function handleSquirrelEvents(): Promise<void> {
-  if (process.platform !== "win32") return;
-
-  const squirrelEvent = process.argv[1];
-  if (!squirrelEvent?.startsWith("--squirrel-")) return;
-
-  // Shortcut management via the Squirrel Update.exe sitting one level up
-  const updateExe = path.join(
-    path.resolve(process.execPath, ".."),
-    "..",
-    "Update.exe",
-  );
-  const exeName = path.basename(process.execPath);
-  const shortcut = (flag: string) => spawnSync(updateExe, [flag, exeName]);
-
-  switch (squirrelEvent) {
-    case "--squirrel-install":
-      shortcut("--createShortcut");
-      await sendAnalyticsEvent("registered");
-      break;
-    case "--squirrel-updated":
-      shortcut("--createShortcut");
-      break;
-    case "--squirrel-uninstall":
-      shortcut("--removeShortcut");
-      await sendAnalyticsEvent("unregistered");
-      break;
-    // --squirrel-obsolete: no-op, just exit
-  }
-
-  process.exit(0);
-}
 
 let tray: Tray | null = null;
 let isQuitting = false;

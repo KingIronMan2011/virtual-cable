@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  AppWindow,
   GripVertical,
   Plus,
   Power,
@@ -98,19 +97,27 @@ export default function TunnelCard({
     return unsub;
   }, [tunnel.active, tunnel.id]);
 
-  // Sample rate + negotiated channel count — fetched once when the tunnel goes active
+  // Sample rate + negotiated channel count — fetched once when the tunnel goes active.
+  // The cancelled flag prevents stale IPC responses from writing back after the tunnel
+  // deactivates (or this effect re-runs) before the async calls resolve.
   useEffect(() => {
     if (!tunnel.active) {
       setSampleRate(null);
       setActiveChannelCount(null);
       return;
     }
+    let cancelled = false;
     if (expSampleRate) {
-      window.electronAPI.getTunnelSampleRate(tunnel.id).then(setSampleRate);
+      window.electronAPI.getTunnelSampleRate(tunnel.id).then((v) => {
+        if (!cancelled) setSampleRate(v);
+      });
     }
-    window.electronAPI
-      .getTunnelChannelCount(tunnel.id)
-      .then(setActiveChannelCount);
+    window.electronAPI.getTunnelChannelCount(tunnel.id).then((v) => {
+      if (!cancelled) setActiveChannelCount(v);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [tunnel.active, tunnel.id, expSampleRate]);
 
   // Auto-focus the name input when entering edit mode
