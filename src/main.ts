@@ -116,7 +116,8 @@ function createWindow(): void {
       event.preventDefault();
       win.hide();
     } else {
-      process.exit(0);
+      isQuitting = true;
+      app.quit(); // Use app.quit() instead of process.exit(0) for graceful shutdown
     }
   });
 
@@ -296,15 +297,22 @@ function forceQuit(): void {
   } catch {
     /* ignore */
   }
-  process.exit(0);
+  app.quit(); // Use app.quit() instead of process.exit(0) for graceful shutdown
 }
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") forceQuit();
 });
 
-app.on("before-quit", () => forceQuit());
-
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+app.on("before-quit", () => {
+  try {
+    destroyAllTunnels();
+  } catch {
+    /* ignore */
+  }
+  try {
+    tray?.destroy();
+  } catch {
+    /* ignore */
+  }
 });
