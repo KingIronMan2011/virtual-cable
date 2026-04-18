@@ -136,10 +136,39 @@ function createMonitor(
  *
  * MME device names are truncated to 31 chars; we match by checking whether
  * one name starts with the other to handle the truncation difference.
+ *
+ * SPECIAL CASE: VB-Audio devices often have issues with WASAPI but work better
+ * with MME, so we always try to find an MME equivalent for VB-Audio.
  */
 function resolveRoutingId(deviceId: number, all: DeviceInfo[]): number {
   const dev = all.find((d) => d.id === deviceId);
-  if (!dev || dev.hostAPIName !== "Windows WASAPI") return deviceId;
+  if (!dev) return deviceId;
+
+  // VB-Audio devices need special handling — try to find MME equivalent
+  const isVBAudio =
+    dev.name?.includes?.("VB-Audio") || dev.name?.includes?.("CABLE");
+  if (isVBAudio) {
+    console.log(`[resolveRoutingId] VB-Audio device detected: ${dev.name}`);
+    const mme = all.find(
+      (d) =>
+        d.hostAPIName === "MME" &&
+        d.name?.includes?.("VB-Audio") &&
+        d.maxInputChannels === dev.maxInputChannels &&
+        d.maxOutputChannels === dev.maxOutputChannels,
+    );
+    if (mme) {
+      console.log(
+        `[resolveRoutingId] Found MME equivalent for VB-Audio: ${mme.name} (device ${mme.id})`,
+      );
+      return mme.id;
+    }
+    console.log(
+      `[resolveRoutingId] No MME equivalent found, keeping WASAPI VB-Audio: ${dev.name}`,
+    );
+    return deviceId;
+  }
+
+  if (dev.hostAPIName !== "Windows WASAPI") return deviceId;
 
   const mme = all.find(
     (d) =>
@@ -161,298 +190,450 @@ export function createTunnel(
   requestedChannels: number | null = null,
   ducking: DuckingConfig = { enabled: false, amount: 0.15, release: 1000 },
 ): void {
-  if (activeTunnels.has(tunnelId)) destroyTunnel(tunnelId);
-  if (inputConfigs.length === 0) return;
+  try {
+    if (activeTunnels.has(tunnelId)) destroyTunnel(tunnelId);
+    if (inputConfigs.length === 0) return;
 
-  const all = getDevices();
-  const isApp = (cfg: InputConfig) => cfg.appPid != null;
-  const routingInputIds = inputConfigs.map((c) =>
-    isApp(c) ? 0 : resolveRoutingId(c.deviceId, all),
-  );
-  const routingOutputId = resolveRoutingId(outputDeviceId, all);
+    const all = getDevices();
+    console.log("[createTunnel] Available devices:", all.length);
 
-  // App inputs don't map to PortAudio devices; use output device capabilities.
-  const primaryInputInfo = isApp(inputConfigs[0])
-    ? undefined
-    : all.find((d) => d.id === routingInputIds[0]);
-  const outputInfo = all.find((d) => d.id === routingOutputId);
+    const isApp = (cfg: InputConfig) => cfg.appPid != null;
+    const routingInputIds = inputConfigs.map((c) =>
+      isApp(c) ? 0 : resolveRoutingId(c.deviceId, all),
+    );
+    const routingOutputId = resolveRoutingId(outputDeviceId, all);
 
-  const maxChannels = Math.min(
-    primaryInputInfo?.maxInputChannels ?? outputInfo?.maxOutputChannels ?? 2,
-    outputInfo?.maxOutputChannels ?? 2,
-  );
-  const channels =
-    requestedChannels !== null
-      ? Math.min(requestedChannels, maxChannels)
-      : maxChannels;
+    console.log("[createTunnel] Routing input IDs:", routingInputIds);
+    console.log("[createTunnel] Routing output ID:", routingOutputId);
 
-  // App inputs always run at 48 kHz (Windows default mix rate).
-  // Device inputs: prefer MME (48 kHz via Windows audio mixer) over WASAPI.
-  const sampleRate = isApp(inputConfigs[0])
-    ? 48000
-    : primaryInputInfo?.hostAPIName === "MME" ||
-        outputInfo?.hostAPIName === "MME"
+    // App inputs don't map to PortAudio devices; use output device capabilities.
+    const primaryInputInfo = isApp(inputConfigs[0])
+      ? undefined
+      : all.find((d) => d.id === routingInputIds[0]);
+    const outputInfo = all.find((d) => d.id === routingOutputId);
+
+    const maxChannels = Math.min(
+      primaryInputInfo?.maxInputChannels ?? outputInfo?.maxOutputChannels ?? 2,
+      outputInfo?.maxOutputChannels ?? 2,
+    );
+    const channels =
+      requestedChannels !== null
+        ? Math.min(requestedChannels, maxChannels)
+        : maxChannels;
+
+    // App inputs always run at 48 kHz (Windows default mix rate).
+    // Device inputs: prefer MME (48 kHz via Windows audio mixer) over WASAPI.
+    const sampleRate = isApp(inputConfigs[0])
       ? 48000
-      : (outputInfo?.defaultSampleRate ??
-        primaryInputInfo?.defaultSampleRate ??
-        48000);
+      : primaryInputInfo?.hostAPIName === "MME" ||
+          outputInfo?.hostAPIName === "MME"
+        ? 48000
+        : (outputInfo?.defaultSampleRate ??
+          primaryInputInfo?.defaultSampleRate ??
+          48000);
 
-  const fpb = framesPerBuffer > 0 ? { framesPerBuffer } : {};
+    const fpb = framesPerBuffer > 0 ? { framesPerBuffer } : {};
 
-  const makeInOptions = (deviceId: number) => ({
-    inOptions: {
-      channelCount: channels,
-      sampleFormat: SampleFormat16Bit,
-      sampleRate,
-      ...fpb,
-      deviceId,
-      closeOnError: true,
-    } as AudioIOOptions,
-  });
+    const makeInOptions = (deviceId: number) => ({
+      inOptions: {
+        channelCount: channels,
+        sampleFormat: SampleFormat16Bit,
+        sampleRate,
+        ...fpb,
+        deviceId,
+        closeOnError: true,
+      } as AudioIOOptions,
+    });
 
-  // Per-input gain array — mutated in-place by setInputGain.
-  const inputGains = inputConfigs.map((c) => c.gain);
-  // Per-input priority array — mutated in-place by setInputPriority.
-  const priorityMask = inputConfigs.map((c) => c.priority);
+    // For VB-Audio devices, use larger buffer to handle timing variations
+    const isVBAudio =
+      outputInfo?.name?.includes?.("VB-Audio") ||
+      outputInfo?.name?.includes?.("CABLE");
+    const vbAudioBuffer = isVBAudio ? { framesPerBuffer: 512 } : fpb;
 
-  // Ducking state — mutated in-place by setDucking.
-  // Threshold is fixed at -30 dBFS (= 0.5 on the 0–1 normalised scale).
-  const DUCK_THRESHOLD = 0.5;
-  let duckEnabled = ducking.enabled;
-  let duckAmount = ducking.amount;
-  let duckReleaseMs = ducking.release;
-  // Smoothed gain applied to non-priority inputs (1.0 = fully open, duckAmount = fully ducked).
-  let duckGain = 1.0;
+    // Per-input gain array — mutated in-place by setInputGain.
+    const inputGains = inputConfigs.map((c) => c.gain);
+    // Per-input priority array — mutated in-place by setInputPriority.
+    const priorityMask = inputConfigs.map((c) => c.priority);
 
-  // Per-secondary FIFO queues.
-  // Decouples chunk sizes between primary (e.g. mic at ~10 ms) and secondary
-  // (e.g. app capture at ~100 ms) so the mixer always advances through secondary
-  // audio at the correct rate rather than replaying the same buffer repeatedly.
-  const secQueues: Buffer[][] = Array.from(
-    { length: Math.max(0, inputConfigs.length - 1) },
-    () => [],
-  );
-  const secQueueBytes: number[] = new Array(
-    Math.max(0, inputConfigs.length - 1),
-  ).fill(0);
-  // Cap each secondary queue at ~200 ms to prevent unbounded growth.
-  const MAX_SEC_BYTES = Math.ceil(sampleRate * channels * 2 * 0.2);
+    // Ducking state — mutated in-place by setDucking.
+    // Threshold is fixed at -30 dBFS (= 0.5 on the 0–1 normalised scale).
+    const DUCK_THRESHOLD = 0.5;
+    let duckEnabled = ducking.enabled;
+    let duckAmount = ducking.amount;
+    let duckReleaseMs = ducking.release;
+    // Smoothed gain applied to non-priority inputs (1.0 = fully open, duckAmount = fully ducked).
+    let duckGain = 1.0;
 
-  // Drain `needed` bytes from secondary queue `qi`, zero-padding if empty.
-  function drainSecondary(qi: number, needed: number): Buffer {
-    if (secQueueBytes[qi] === 0) return Buffer.alloc(needed, 0);
-    const out = Buffer.allocUnsafe(needed);
-    let written = 0;
-    const q = secQueues[qi];
-    while (written < needed && q.length > 0) {
-      const head = q[0];
-      const take = Math.min(needed - written, head.length);
-      head.copy(out, written, 0, take);
-      written += take;
-      secQueueBytes[qi] -= take;
-      if (take === head.length) {
-        q.shift();
-      } else {
-        q[0] = head.subarray(take);
-      }
-    }
-    if (written < needed) out.fill(0, written);
-    return out;
-  }
+    // Per-secondary FIFO queues.
+    // Decouples chunk sizes between primary (e.g. mic at ~10 ms) and secondary
+    // (e.g. app capture at ~100 ms) so the mixer always advances through secondary
+    // audio at the correct rate rather than replaying the same buffer repeatedly.
+    const secQueues: Buffer[][] = Array.from(
+      { length: Math.max(0, inputConfigs.length - 1) },
+      () => [],
+    );
+    const secQueueBytes: number[] = new Array(
+      Math.max(0, inputConfigs.length - 1),
+    ).fill(0);
+    // Cap each secondary queue at ~200 ms to prevent unbounded growth.
+    const MAX_SEC_BYTES = Math.ceil(sampleRate * channels * 2 * 0.2);
 
-  const mixerTransform = new Transform({
-    transform(primaryChunk: Buffer, _enc, cb) {
-      // Drain exactly primaryChunk.length bytes from each secondary queue.
-      // This advances each secondary stream in lock-step with the primary,
-      // regardless of how large each source's individual chunks are.
-      const secBuffers = secQueues.map((_, qi) =>
-        drainSecondary(qi, primaryChunk.length),
-      );
-
-      // Ducking: determine whether any priority input is above threshold this chunk.
-      const hasPriority = priorityMask.some((p) => p);
-      const hasNonPriority = priorityMask.some((p) => !p);
-      const canDuck = duckEnabled && hasPriority && hasNonPriority;
-
-      if (canDuck) {
-        let shouldDuck = false;
-        if (priorityMask[0] && rmsLevel(primaryChunk) > DUCK_THRESHOLD) {
-          shouldDuck = true;
+    // Drain `needed` bytes from secondary queue `qi`, zero-padding if empty.
+    function drainSecondary(qi: number, needed: number): Buffer {
+      if (secQueueBytes[qi] === 0) return Buffer.alloc(needed, 0);
+      const out = Buffer.allocUnsafe(needed);
+      let written = 0;
+      const q = secQueues[qi];
+      while (written < needed && q.length > 0) {
+        const head = q[0];
+        const take = Math.min(needed - written, head.length);
+        head.copy(out, written, 0, take);
+        written += take;
+        secQueueBytes[qi] -= take;
+        if (take === head.length) {
+          q.shift();
+        } else {
+          q[0] = head.subarray(take);
         }
-        if (!shouldDuck) {
-          for (let s = 0; s < secBuffers.length; s++) {
-            if (
-              priorityMask[s + 1] &&
-              rmsLevel(secBuffers[s]) > DUCK_THRESHOLD
-            ) {
-              shouldDuck = true;
-              break;
+      }
+      if (written < needed) out.fill(0, written);
+      return out;
+    }
+
+    let dataFlowCounter = 0;
+    const mixerTransform = new Transform({
+      transform(primaryChunk: Buffer, _enc, cb) {
+        dataFlowCounter++;
+        if (dataFlowCounter % 100 === 0) {
+          console.log(
+            `[createTunnel:${tunnelId}] Mixer processed ${dataFlowCounter} chunks, current: ${primaryChunk.length} bytes`,
+          );
+        }
+
+        // Drain exactly primaryChunk.length bytes from each secondary queue.
+        // This advances each secondary stream in lock-step with the primary,
+        // regardless of how large each source's individual chunks are.
+        const secBuffers = secQueues.map((_, qi) =>
+          drainSecondary(qi, primaryChunk.length),
+        );
+
+        // Ducking: determine whether any priority input is above threshold this chunk.
+        const hasPriority = priorityMask.some((p) => p);
+        const hasNonPriority = priorityMask.some((p) => !p);
+        const canDuck = duckEnabled && hasPriority && hasNonPriority;
+
+        if (canDuck) {
+          let shouldDuck = false;
+          if (priorityMask[0] && rmsLevel(primaryChunk) > DUCK_THRESHOLD) {
+            shouldDuck = true;
+          }
+          if (!shouldDuck) {
+            for (let s = 0; s < secBuffers.length; s++) {
+              if (
+                priorityMask[s + 1] &&
+                rmsLevel(secBuffers[s]) > DUCK_THRESHOLD
+              ) {
+                shouldDuck = true;
+                break;
+              }
             }
           }
-        }
-        // Exponential smoothing: attack = 20 ms fixed, release = user-configured.
-        const frameCount = primaryChunk.length / 2 / channels;
-        const chunkMs = (frameCount / sampleRate) * 1000;
-        if (shouldDuck) {
-          const alpha = Math.exp(-chunkMs / 20); // 20 ms attack
-          duckGain = alpha * duckGain + (1 - alpha) * duckAmount;
+          // Exponential smoothing: attack = 20 ms fixed, release = user-configured.
+          const frameCount = primaryChunk.length / 2 / channels;
+          const chunkMs = (frameCount / sampleRate) * 1000;
+          if (shouldDuck) {
+            const alpha = Math.exp(-chunkMs / 20); // 20 ms attack
+            duckGain = alpha * duckGain + (1 - alpha) * duckAmount;
+          } else {
+            const alpha = Math.exp(-chunkMs / Math.max(duckReleaseMs, 1));
+            duckGain = alpha * duckGain + (1 - alpha) * 1.0;
+            if (duckGain > 0.999) duckGain = 1.0; // snap to avoid drift
+          }
         } else {
-          const alpha = Math.exp(-chunkMs / Math.max(duckReleaseMs, 1));
-          duckGain = alpha * duckGain + (1 - alpha) * 1.0;
-          if (duckGain > 0.999) duckGain = 1.0; // snap to avoid drift
-        }
-      } else {
-        duckGain = 1.0;
-      }
-
-      // Fast path: single input, unity gain, no ducking involved.
-      if (inputGains.length === 1 && inputGains[0] === 1 && duckGain === 1.0) {
-        cb(null, primaryChunk);
-        return;
-      }
-
-      const result = Buffer.allocUnsafe(primaryChunk.length);
-      for (let i = 0; i + 1 < primaryChunk.length; i += 2) {
-        const g0 = priorityMask[0] ? inputGains[0] : inputGains[0] * duckGain;
-        let sum =
-          g0 === 1
-            ? primaryChunk.readInt16LE(i)
-            : Math.round(primaryChunk.readInt16LE(i) * g0);
-
-        for (let s = 0; s < secBuffers.length; s++) {
-          const gs = priorityMask[s + 1]
-            ? inputGains[s + 1]
-            : inputGains[s + 1] * duckGain;
-          sum +=
-            gs === 1
-              ? secBuffers[s].readInt16LE(i)
-              : Math.round(secBuffers[s].readInt16LE(i) * gs);
+          duckGain = 1.0;
         }
 
-        result.writeInt16LE(Math.max(-32768, Math.min(32767, sum)), i);
-      }
-      cb(null, result);
-    },
-  });
-
-  const primaryInput: AnyInputStream = isApp(inputConfigs[0])
-    ? new AppCaptureReadable(inputConfigs[0].appPid!, channels)
-    : new AudioIO(makeInOptions(routingInputIds[0]));
-
-  const output = new AudioIO({
-    outOptions: {
-      channelCount: channels,
-      sampleFormat: SampleFormat16Bit,
-      sampleRate,
-      ...fpb,
-      deviceId: routingOutputId,
-      closeOnError: false,
-    } as AudioIOOptions,
-  });
-
-  const {
-    transform: monitor,
-    setMuted,
-    setGain,
-  } = createMonitor(tunnelId, (level) => {
-    levelEmitter.emit("level", tunnelId, level);
-  });
-
-  // Wire up secondary inputs — each feeds its latest chunk into the mixer buffer.
-  // Secondary failures are non-fatal: the slot stays null (silence) and the
-  // primary + other secondaries continue routing.
-  const secondaryInputs: AnyInputStream[] = [];
-  for (let i = 1; i < inputConfigs.length; i++) {
-    const secInput: AnyInputStream = isApp(inputConfigs[i])
-      ? new AppCaptureReadable(inputConfigs[i].appPid!, channels)
-      : new AudioIO(makeInOptions(routingInputIds[i]));
-    const secIndex = i - 1;
-    const sink = new Writable({
-      write(chunk: Buffer, _, done) {
-        secQueues[secIndex].push(chunk);
-        secQueueBytes[secIndex] += chunk.length;
-        // If the queue grows beyond ~200 ms, drop the oldest chunk to stay
-        // in sync rather than accumulating unbounded delay.
-        while (
-          secQueueBytes[secIndex] > MAX_SEC_BYTES &&
-          secQueues[secIndex].length > 0
+        // Fast path: single input, unity gain, no ducking involved.
+        if (
+          inputGains.length === 1 &&
+          inputGains[0] === 1 &&
+          duckGain === 1.0
         ) {
-          secQueueBytes[secIndex] -= secQueues[secIndex].shift()!.length;
+          cb(null, primaryChunk);
+          return;
         }
-        done();
+
+        const result = Buffer.allocUnsafe(primaryChunk.length);
+        for (let i = 0; i + 1 < primaryChunk.length; i += 2) {
+          const g0 = priorityMask[0] ? inputGains[0] : inputGains[0] * duckGain;
+          let sum =
+            g0 === 1
+              ? primaryChunk.readInt16LE(i)
+              : Math.round(primaryChunk.readInt16LE(i) * g0);
+
+          for (let s = 0; s < secBuffers.length; s++) {
+            const gs = priorityMask[s + 1]
+              ? inputGains[s + 1]
+              : inputGains[s + 1] * duckGain;
+            sum +=
+              gs === 1
+                ? secBuffers[s].readInt16LE(i)
+                : Math.round(secBuffers[s].readInt16LE(i) * gs);
+          }
+
+          result.writeInt16LE(Math.max(-32768, Math.min(32767, sum)), i);
+        }
+        cb(null, result);
       },
     });
-    (secInput as unknown as NodeJS.ReadableStream).pipe(sink);
-    (secInput as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
-      console.error(
-        `[tunnel:${tunnelId}] secondary input ${i} error:`,
-        err.message,
-      );
+
+    const primaryInput: AnyInputStream = isApp(inputConfigs[0])
+      ? new AppCaptureReadable(inputConfigs[0].appPid!, channels)
+      : new AudioIO(makeInOptions(routingInputIds[0]));
+
+    // Validate output device before creating stream
+    console.log(`[createTunnel:${tunnelId}] Output device info:`, {
+      id: routingOutputId,
+      name: outputInfo?.name,
+      hostAPI: outputInfo?.hostAPIName,
+      maxOutputChannels: outputInfo?.maxOutputChannels,
+      defaultSampleRate: outputInfo?.defaultSampleRate,
+      requestedChannels: channels,
+      requestedSampleRate: sampleRate,
+      isVBAudio,
+      bufferSize: vbAudioBuffer.framesPerBuffer || "default",
     });
-    secondaryInputs.push(secInput);
-  }
 
-  (primaryInput as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
-    console.error(`[tunnel:${tunnelId}] primary input error:`, err.message);
-    destroyTunnel(tunnelId);
-  });
-  (output as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
-    console.error(`[tunnel:${tunnelId}] output error:`, err.message);
-    destroyTunnel(tunnelId);
-  });
+    const output = new AudioIO({
+      outOptions: {
+        channelCount: Math.min(channels, outputInfo?.maxOutputChannels || 2),
+        sampleFormat: SampleFormat16Bit,
+        sampleRate,
+        ...vbAudioBuffer,
+        deviceId: routingOutputId,
+        closeOnError: false,
+      } as AudioIOOptions,
+    });
 
-  (primaryInput as unknown as NodeJS.ReadableStream)
-    .pipe(mixerTransform)
-    .pipe(monitor)
-    .pipe(output as unknown as NodeJS.WritableStream);
+    console.log(
+      "[createTunnel] Primary input created:",
+      primaryInput.constructor.name,
+    );
+    console.log("[createTunnel] Output created:", output.constructor.name);
 
-  output.start();
-  for (const sec of secondaryInputs) {
-    (sec as unknown as { start(): void }).start();
-  }
-  (primaryInput as unknown as { start(): void }).start();
+    const {
+      transform: monitor,
+      setMuted,
+      setGain,
+    } = createMonitor(tunnelId, (level) => {
+      levelEmitter.emit("level", tunnelId, level);
+    });
 
-  // Store original (pre-resolve) device IDs so reloadAllTunnels can re-resolve
-  // them correctly if device IDs shift after a rescan.
-  const storedInputConfigs: InputConfig[] = inputConfigs.map((c, i) => ({
-    deviceId: c.deviceId,
-    appPid: c.appPid,
-    gain: inputGains[i],
-    priority: priorityMask[i],
-  }));
+    // Wire up secondary inputs — each feeds its latest chunk into the mixer buffer.
+    // Secondary failures are non-fatal: the slot stays null (silence) and the
+    // primary + other secondaries continue routing.
+    const secondaryInputs: AnyInputStream[] = [];
+    for (let i = 1; i < inputConfigs.length; i++) {
+      const secInput: AnyInputStream = isApp(inputConfigs[i])
+        ? new AppCaptureReadable(inputConfigs[i].appPid!, channels)
+        : new AudioIO(makeInOptions(routingInputIds[i]));
+      const secIndex = i - 1;
+      const sink = new Writable({
+        write(chunk: Buffer, _, done) {
+          secQueues[secIndex].push(chunk);
+          secQueueBytes[secIndex] += chunk.length;
+          // If the queue grows beyond ~200 ms, drop the oldest chunk to stay
+          // in sync rather than accumulating unbounded delay.
+          while (
+            secQueueBytes[secIndex] > MAX_SEC_BYTES &&
+            secQueues[secIndex].length > 0
+          ) {
+            secQueueBytes[secIndex] -= secQueues[secIndex].shift()!.length;
+          }
+          done();
+        },
+      });
+      (secInput as unknown as NodeJS.ReadableStream).pipe(sink);
+      (secInput as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
+        console.error(
+          `[tunnel:${tunnelId}] secondary input ${i} error:`,
+          err.message,
+        );
+      });
+      secondaryInputs.push(secInput);
+    }
 
-  activeTunnels.set(tunnelId, {
-    primaryInput,
-    secondaryInputs,
-    output,
-    inputConfigs: storedInputConfigs,
-    outputDeviceId,
-    sampleRate,
-    channelCount: channels,
-    duckingConfig: { ...ducking },
-    setMuted,
-    setGain,
-    setInputGain: (index: number, gain: number) => {
-      if (index < inputGains.length) {
-        inputGains[index] = gain;
-        storedInputConfigs[index].gain = gain;
+    (primaryInput as unknown as NodeJS.EventEmitter).on(
+      "error",
+      (err: Error) => {
+        console.error(`[tunnel:${tunnelId}] primary input error:`, err.message);
+        destroyTunnel(tunnelId);
+      },
+    );
+    (output as unknown as NodeJS.EventEmitter).on("error", (err: Error) => {
+      console.error(`[tunnel:${tunnelId}] output error:`, err.message);
+      destroyTunnel(tunnelId);
+    });
+
+    // Track data flowing to output
+    let outputChunkCount = 0;
+    const originalPipe = (output as unknown as NodeJS.WritableStream).write as (
+      chunk: Buffer,
+      encodingOrCallback?: string | (() => void),
+      callback?: () => void,
+    ) => boolean;
+    (output as unknown as Record<string, unknown>).write = function (
+      chunk: Buffer,
+      ...args: (string | (() => void))[]
+    ): boolean {
+      outputChunkCount++;
+      if (outputChunkCount % 100 === 0) {
+        console.log(
+          `[createTunnel:${tunnelId}] Output received ${outputChunkCount} chunks, current: ${chunk?.length || "unknown"} bytes`,
+        );
       }
-    },
-    setInputPriority: (index: number, priority: boolean) => {
-      if (index < priorityMask.length) {
-        priorityMask[index] = priority;
-        storedInputConfigs[index].priority = priority;
+      return originalPipe.call(this, chunk, ...args);
+    };
+
+    (primaryInput as unknown as NodeJS.ReadableStream)
+      .pipe(mixerTransform)
+      .pipe(monitor)
+      .pipe(output as unknown as NodeJS.WritableStream);
+
+    // Start inputs first to begin data flow, then start output to receive it
+    try {
+      (primaryInput as unknown as { start(): void }).start();
+      console.log(`[createTunnel:${tunnelId}] Primary input started`);
+    } catch (e) {
+      console.error(
+        `[createTunnel:${tunnelId}] Failed to start primary input:`,
+        e,
+      );
+      throw e;
+    }
+
+    for (let i = 0; i < secondaryInputs.length; i++) {
+      try {
+        (secondaryInputs[i] as unknown as { start(): void }).start();
+        console.log(`[createTunnel:${tunnelId}] Secondary input ${i} started`);
+      } catch (e) {
+        console.error(
+          `[createTunnel:${tunnelId}] Failed to start secondary input ${i}:`,
+          e,
+        );
+        // Don't throw, secondary input failure is non-fatal
       }
-    },
-    setDucking: (cfg: DuckingConfig) => {
-      duckEnabled = cfg.enabled;
-      duckAmount = cfg.amount;
-      duckReleaseMs = cfg.release;
-      // Reset smoothed gain when disabling so it doesn't linger at a reduced value.
-      if (!cfg.enabled) duckGain = 1.0;
-      activeTunnels.get(tunnelId)!.duckingConfig = { ...cfg };
-    },
-  });
+    }
+
+    // Try to start output with retry logic
+    // NOTE: WASAPI VB-Audio devices don't work with explicit start() calls.
+    // They fail with "Unanticipated host error" and crash the PortAudio driver.
+    // Solution: For WASAPI VB-Audio, skip start() entirely.
+
+    const isWASAPIVBAudio =
+      isVBAudio && outputInfo?.hostAPIName === "Windows WASAPI";
+
+    if (isWASAPIVBAudio) {
+      // For WASAPI VB-Audio, skip explicit start() to avoid crash
+      console.log(
+        `[createTunnel:${tunnelId}] WASAPI VB-Audio detected - skipping start() to prevent driver crash`,
+      );
+    } else {
+      // For non-WASAPI-VB-Audio devices, use retry logic
+      const maxRetries = 3;
+      let retries = 0;
+
+      const tryStartOutput = () => {
+        retries++;
+        try {
+          console.log(
+            `[createTunnel:${tunnelId}] Attempting to start output stream (attempt ${retries}/${maxRetries})`,
+          );
+          output.start();
+          console.log(
+            `[createTunnel:${tunnelId}] Output stream started successfully on attempt ${retries}`,
+          );
+        } catch (e) {
+          const err = e instanceof Error ? e : new Error(String(e));
+          console.error(
+            `[createTunnel:${tunnelId}] Output start attempt ${retries} failed:`,
+            err.message,
+          );
+
+          if (retries < maxRetries) {
+            console.log(
+              `[createTunnel:${tunnelId}] Retrying output start in 100ms...`,
+            );
+            setTimeout(tryStartOutput, 100);
+          } else {
+            console.error(
+              `[createTunnel:${tunnelId}] Failed to start output after ${maxRetries} attempts`,
+            );
+            destroyTunnel(tunnelId);
+            throw new Error(
+              `Failed to start output after ${maxRetries} attempts: ${err.message}`,
+            );
+          }
+        }
+      };
+
+      try {
+        tryStartOutput();
+      } catch (e) {
+        console.error(`[createTunnel:${tunnelId}] Output start failed:`, e);
+        throw e;
+      }
+    }
+    // Store original (pre-resolve) device IDs so reloadAllTunnels can re-resolve
+    // them correctly if device IDs shift after a rescan.
+    const storedInputConfigs: InputConfig[] = inputConfigs.map((c, i) => ({
+      deviceId: c.deviceId,
+      appPid: c.appPid,
+      gain: inputGains[i],
+      priority: priorityMask[i],
+    }));
+
+    activeTunnels.set(tunnelId, {
+      primaryInput,
+      secondaryInputs,
+      output,
+      inputConfigs: storedInputConfigs,
+      outputDeviceId,
+      sampleRate,
+      channelCount: channels,
+      duckingConfig: { ...ducking },
+      setMuted,
+      setGain,
+      setInputGain: (index: number, gain: number) => {
+        if (index < inputGains.length) {
+          inputGains[index] = gain;
+          storedInputConfigs[index].gain = gain;
+        }
+      },
+      setInputPriority: (index: number, priority: boolean) => {
+        if (index < priorityMask.length) {
+          priorityMask[index] = priority;
+          storedInputConfigs[index].priority = priority;
+        }
+      },
+      setDucking: (cfg: DuckingConfig) => {
+        duckEnabled = cfg.enabled;
+        duckAmount = cfg.amount;
+        duckReleaseMs = cfg.release;
+        // Reset smoothed gain when disabling so it doesn't linger at a reduced value.
+        if (!cfg.enabled) duckGain = 1.0;
+        activeTunnels.get(tunnelId)!.duckingConfig = { ...cfg };
+      },
+    });
+
+    console.log("[createTunnel] Tunnel created successfully:", tunnelId);
+  } catch (error) {
+    console.error("[createTunnel] Failed to create tunnel:", error);
+    if (activeTunnels.has(tunnelId)) {
+      destroyTunnel(tunnelId);
+    }
+  }
 }
 
 export function destroyTunnel(tunnelId: string): void {
