@@ -16,11 +16,7 @@ import { cp, mkdir } from "node:fs/promises";
 // (before the asar is sealed), and the Rollup banner in vite.main.config.ts
 // prepends that path to module.paths so require() finds them.
 const NATIVE_MODULES = [
-  "naudiodon",
-  "segfault-handler",
-  "app-capture",
-  "bindings", // naudiodon's native-loader dep
-  "file-uri-to-path", // bindings' dep
+  "virtual-cable-engine",
 ];
 
 const config: ForgeConfig = {
@@ -44,7 +40,7 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {
     // Native modules must be compiled against Electron's ABI.
-    onlyModules: ["naudiodon", "segfault-handler", "app-capture"],
+    onlyModules: ["virtual-cable-engine"],
     force: true,
   },
   hooks: {

@@ -1,9 +1,9 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, dialog } from "electron";
 import path from "node:path";
 import { existsSync, writeFileSync, readFileSync } from "node:fs";
-import { getAudioDevices } from "./audio/devices";
-import { listAudioApps } from "./audio/appCapture";
 import {
+  getAudioDevices,
+  listAudioApps,
   createTunnel,
   destroyTunnel,
   destroyAllTunnels,
@@ -16,8 +16,8 @@ import {
   setTunnelInputPriority,
   setTunnelDucking,
   levelEmitter,
-} from "./audio/router";
-import type { InputConfig, DuckingConfig } from "./audio/router";
+} from "./audio/engine";
+import type { InputConfig, DuckingConfig } from "./audio/engine";
 import {
   isVBAudioInstalled,
   openInstallPage,

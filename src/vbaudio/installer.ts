@@ -8,7 +8,7 @@ import { shell } from "electron";
 import https from "node:https";
 import http from "node:http";
 import AdmZip from "adm-zip";
-import { getDevices } from "naudiodon";
+import { getAudioDevices } from "../audio/engine";
 
 const execFileAsync = promisify(execFile);
 
@@ -24,12 +24,12 @@ export async function isVBAudioInstalled(): Promise<boolean> {
   // Primary check: does the CABLE audio device actually appear in PortAudio?
   // This is the ground truth — registry keys can be stale after an uninstall.
   try {
-    const devices = getDevices();
+    const devices = getAudioDevices();
     if (devices.some((d) => d.name.toLowerCase().includes("cable"))) {
       return true;
     }
   } catch {
-    // naudiodon not ready yet — fall through to registry check
+    // Engine not ready yet — fall through to registry check
   }
 
   // Fallback: check known registry keys for the VB-Audio driver service
