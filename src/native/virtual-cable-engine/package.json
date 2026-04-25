@@ -5,6 +5,6 @@
   "main": "./build/Release/virtual_cable_engine.node",
   "private": true,
   "scripts": {
-    "install": "node-gyp rebuild"
+    "install": "echo Skipping auto-build; rebuild.js handles this"
   }
 }

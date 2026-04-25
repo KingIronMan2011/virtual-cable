@@ -17,7 +17,7 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "types": "tsc --noEmit",
-    "postinstall": "electron-rebuild -f -w virtual-cable-engine"
+    "postinstall": "node rebuild.js"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.1",

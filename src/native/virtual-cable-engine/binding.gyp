@@ -31,7 +31,7 @@
             "-l../portaudio/bin/portaudio_x64.lib",
             "-lole32", "-loleaut32", "-luuid",
             "-lwinmm", "-lksuser", "-lpsapi",
-            "-lruntimeobject"
+            "-lruntimeobject", "-lmmdevapi"
           ],
           "copies": [
             {

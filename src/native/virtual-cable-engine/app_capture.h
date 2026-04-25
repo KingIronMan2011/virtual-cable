@@ -81,4 +81,9 @@ private:
     /* Opaque COM interfaces — defined in the .cpp */
     struct ComState;
     ComState* com_ = nullptr;
+
+    /* CaptureLoop needs access to ComState */
+    friend void CaptureLoop(AppCaptureStream::ComState*,
+                            AppCaptureStream::DataCallback,
+                            int, std::atomic<bool>&);
 };

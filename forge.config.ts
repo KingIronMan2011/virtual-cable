@@ -34,7 +34,7 @@ const config: ForgeConfig = {
       //
       // Unpack .node binaries (can't be dlopen'd from inside an archive) and
       // .dll files (portaudio_x64.dll must be on the real filesystem so Windows
-      // can LoadLibrary it from the same directory as naudiodon.node).
+      // can LoadLibrary it from the same directory as virtual_cable_engine.node).
       unpack: "*.{node,dll}",
     },
   },
