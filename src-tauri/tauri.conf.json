@@ -33,8 +33,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../src/native/virtual-cable-engine/portaudio/bin/portaudio_x64.dll"
-    ]
+    "resources": []
   }
 }

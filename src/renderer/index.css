@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,700;1,300&display=swap');
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────
@@ -10,7 +11,7 @@
   --color-border: #252018;
   --color-border-hi: #3d3428;
   --color-text: #ede8df;
-  --color-muted: #5e5750;
+  --color-muted: #7c746c;
   --color-accent: #e8a838;
   --color-active: #3dd6c8;
 
@@ -696,6 +697,7 @@ body::after {
   border-radius: 1px;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
   width: 52px;
   flex-shrink: 0;

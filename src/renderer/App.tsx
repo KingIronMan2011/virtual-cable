@@ -66,7 +66,8 @@ export default function App() {
     ]).then(([devs, saved, installed, s, apps]) => {
       setDevices(devs);
       setAudioApps(apps);
-      setTunnels(saved);
+      // Ensure tunnels start in an inactive state upon app launch
+      setTunnels(saved.map(t => ({ ...t, active: false, muted: false })));
       setVbInstalled(installed);
       setSettings(s);
       loaded.current = true;
@@ -75,7 +76,9 @@ export default function App() {
 
   useEffect(() => {
     if (!loaded.current) return;
-    tauriAPI.saveTunnels(tunnels);
+    // Always save tunnels as inactive so they don't auto-start on next launch
+    const toSave = tunnels.map((t) => ({ ...t, active: false, muted: false }));
+    tauriAPI.saveTunnels(toSave);
   }, [tunnels]);
 
   // Poll for newly started audio apps every 3 s so the user doesn't need to restart.

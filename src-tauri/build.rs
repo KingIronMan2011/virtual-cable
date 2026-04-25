@@ -4,6 +4,13 @@ fn main() {
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let engine_dir = manifest_dir.join("../src/native/virtual-cable-engine");
 
+    println!("cargo:rerun-if-changed={}", engine_dir.join("engine.cpp").display());
+    println!("cargo:rerun-if-changed={}", engine_dir.join("engine.h").display());
+    println!("cargo:rerun-if-changed={}", engine_dir.join("app_capture.cpp").display());
+    println!("cargo:rerun-if-changed={}", engine_dir.join("app_capture.h").display());
+    println!("cargo:rerun-if-changed={}", engine_dir.join("engine_c_api.cpp").display());
+    println!("cargo:rerun-if-changed={}", engine_dir.join("engine_c_api.h").display());
+
     let mut build = cc::Build::new();
     build.cpp(true);
     
@@ -41,6 +48,13 @@ fn main() {
 
     println!("cargo:rustc-link-search=native={}", portaudio_path.display());
     println!("cargo:rustc-link-lib=portaudio_x64");
+    
+    if target_os == "windows" {
+        // Use delay loading so the app can start even if the DLL is not next to the EXE.
+        // We will set the DLL search path at runtime to point to the resources folder.
+        println!("cargo:rustc-link-arg=/DELAYLOAD:portaudio_x64.dll");
+        println!("cargo:rustc-link-lib=delayimp");
+    }
 
     // Copy DLL to target directory for development
     let dll_path = portaudio_path.join("portaudio_x64.dll");

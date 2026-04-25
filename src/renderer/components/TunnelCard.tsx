@@ -322,7 +322,7 @@ export default function TunnelCard({
                   }
                 >
                   <Star
-                    size={10}
+                    size={12}
                     strokeWidth={inp.priority ? 0 : 1.5}
                     fill={inp.priority ? "currentColor" : "none"}
                   />
@@ -333,14 +333,14 @@ export default function TunnelCard({
                     onClick={() => removeInput(i)}
                     title="Remove input"
                   >
-                    <X size={11} strokeWidth={2} />
+                    <X size={15} strokeWidth={2} />
                   </button>
                 )}
               </div>
             ))}
           </div>
           <button className="add-input-btn" onClick={addInput}>
-            <Plus size={11} strokeWidth={2.5} /> Add
+            <Plus size={15} strokeWidth={2.5} /> Add
           </button>
         </div>
 

@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 
 extern "C" {
     fn engine_initialize();
-    // fn engine_terminate(); // We'll call this on exit if needed
+    fn engine_terminate();
 
     fn engine_get_audio_devices(
         cb: extern "C" fn(c_int, *const c_char, c_int, c_int, *const c_char, c_int, *mut c_void),
@@ -36,7 +36,7 @@ extern "C" {
     );
 
     fn engine_destroy_tunnel(tunnel_id: *const c_char);
-    // fn engine_destroy_all_tunnels();
+    fn engine_destroy_all_tunnels();
     // fn engine_reload_all_tunnels(frames_per_buffer: c_int);
 
     fn engine_set_tunnel_muted(tunnel_id: *const c_char, muted: bool);
@@ -303,8 +303,111 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { api: _api, .. } = event {
+                // If minimizeToTray is enabled, we hide the window instead of closing it
+                // We'll check the setting here. For now, let's just always stop tunnels.
+                unsafe {
+                    engine_destroy_all_tunnels();
+                }
+            }
+        })
         .setup(|app| {
+            use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState};
+            use tauri::menu::{Menu, MenuItem};
+
+            // Setup Tray Icon
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "quit" => {
+                            unsafe { engine_terminate(); }
+                            app.exit(0);
+                        }
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click { 
+                        button: MouseButton::Left, 
+                        button_state: MouseButtonState::Up, .. 
+                    } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             let _ = APP_HANDLE.set(app.handle().clone());
+            
+            // On Windows, ensure portaudio_x64.dll exists
+            #[cfg(target_os = "windows")]
+            {
+                use std::io::Write;
+                use std::os::windows::ffi::OsStrExt;
+                
+                extern "system" {
+                    fn SetDllDirectoryW(lpPathName: *const u16) -> i32;
+                }
+
+                let dll_bytes = include_bytes!("../../src/native/virtual-cable-engine/portaudio/bin/portaudio_x64.dll");
+                let dll_name = "portaudio_x64.dll";
+                
+                // Try several locations to unpack the DLL
+                let mut success = false;
+                let mut search_paths = Vec::new();
+
+                // 1. Next to the EXE (best for portable)
+                if let Ok(exe_path) = std::env::current_exe() {
+                    if let Some(parent) = exe_path.parent() {
+                        let target = parent.join(dll_name);
+                        search_paths.push(parent.to_path_buf());
+                        if !target.exists() {
+                            if let Ok(mut f) = std::fs::File::create(&target) {
+                                let _ = f.write_all(dll_bytes);
+                            }
+                        }
+                        if target.exists() { success = true; }
+                    }
+                }
+
+                // 2. App Data (fallback for installed version)
+                if !success {
+                    if let Ok(data_dir) = app.path().app_data_dir() {
+                        let _ = std::fs::create_dir_all(&data_dir);
+                        let target = data_dir.join(dll_name);
+                        search_paths.push(data_dir.clone());
+                        if !target.exists() {
+                            if let Ok(mut f) = std::fs::File::create(&target) {
+                                let _ = f.write_all(dll_bytes);
+                            }
+                        }
+                    }
+                }
+
+                // Add all potential paths to the search path
+                for path in search_paths {
+                    let mut path_wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+                    path_wide.push(0);
+                    unsafe { SetDllDirectoryW(path_wide.as_ptr()); }
+                }
+            }
+
             unsafe {
                 engine_initialize();
                 engine_set_level_callback(on_audio_level, std::ptr::null_mut());
@@ -328,6 +431,13 @@ pub fn run() {
             load_settings,
             save_settings,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                unsafe {
+                    engine_terminate();
+                }
+            }
+        });
 }
