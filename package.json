@@ -7,27 +7,16 @@
   "type": "commonjs",
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "electron-forge start",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "publish": "electron-forge publish",
-    "build:icons": "node scripts/build-icons.js",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "tauri": "tauri",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "types": "tsc --noEmit",
-    "postinstall": "node rebuild.js"
+    "types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@electron-forge/cli": "^7.11.1",
-    "@electron-forge/maker-deb": "^7.11.1",
-    "@electron-forge/maker-rpm": "^7.11.1",
-    "@electron-forge/maker-squirrel": "^7.11.1",
-    "@electron-forge/maker-zip": "^7.11.1",
-    "@electron-forge/plugin-fuses": "^7.11.1",
-    "@electron-forge/plugin-vite": "^7.11.1",
-    "@electron/fuses": "^1.8.0",
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
     "@types/adm-zip": "^0.5.8",
@@ -36,7 +25,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "electron": "^41.1.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -49,10 +37,9 @@
     "wrangler": "^4.80.0"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
     "adm-zip": "^0.5.17",
-    "electron-squirrel-startup": "^1.0.1",
     "lucide-react": "^1.7.0",
-    "virtual-cable-engine": "file:src/native/virtual-cable-engine",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
