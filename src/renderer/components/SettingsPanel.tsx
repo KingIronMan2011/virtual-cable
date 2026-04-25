@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { X } from "lucide-react";
 import packageJson from "../../../package.json";
-import type { UpdateState } from "../../updater/updater";
-import type { AppSettings, BufferSize } from "../../types";
+import type { AppSettings, BufferSize, UpdateState } from "../../types";
+import { tauriAPI } from "../tauriAPI";
 
 interface Props {
   open: boolean;
@@ -51,13 +51,13 @@ export default function SettingsPanel({ open, onClose }: Props) {
   // Load settings and current update state on open
   useEffect(() => {
     if (!open) return;
-    window.electronAPI.loadSettings().then(setSettings);
-    window.electronAPI.getUpdateState().then(setUpdateState);
+    tauriAPI.loadSettings().then(setSettings);
+    tauriAPI.getUpdateState().then(setUpdateState);
   }, [open]);
 
   // Subscribe to live update status pushes from main process
   useEffect(() => {
-    const unsub = window.electronAPI.onUpdateStatus(setUpdateState);
+    const unsub = tauriAPI.onUpdateStatus(setUpdateState);
     return unsub;
   }, []);
 
@@ -65,17 +65,17 @@ export default function SettingsPanel({ open, onClose }: Props) {
     async (patch: Partial<typeof settings>) => {
       const next = { ...settings, ...patch };
       setSettings(next);
-      await window.electronAPI.saveSettings(next);
+      await tauriAPI.saveSettings(next);
     },
     [settings],
   );
 
   const checkNow = useCallback(() => {
-    window.electronAPI.checkForUpdates();
+    tauriAPI.checkForUpdates();
   }, []);
 
   const installNow = useCallback(() => {
-    window.electronAPI.installUpdate();
+    tauriAPI.installUpdate();
   }, []);
 
   const isChecking =
@@ -120,7 +120,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
               <div className="settings-row">
                 <span className="settings-row-label">Built with</span>
                 <span className="settings-row-val">
-                  Electron · React · PortAudio
+                  Tauri · React · PortAudio
                 </span>
               </div>
             </div>

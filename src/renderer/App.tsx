@@ -21,6 +21,7 @@ import type {
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
 import SettingsPanel from "./components/SettingsPanel";
+import { tauriAPI } from "./tauriAPI";
 
 const SETTINGS_DEFAULTS: AppSettings = {
   autoUpdate: false,
@@ -57,11 +58,11 @@ export default function App() {
 
   useEffect(() => {
     Promise.all([
-      window.electronAPI.getDevices(),
-      window.electronAPI.loadTunnels(),
-      window.electronAPI.checkVBAudioInstalled(),
-      window.electronAPI.loadSettings(),
-      window.electronAPI.getAudioApps(),
+      tauriAPI.getDevices(),
+      tauriAPI.loadTunnels(),
+      tauriAPI.checkVBAudioInstalled(),
+      tauriAPI.loadSettings(),
+      tauriAPI.getAudioApps(),
     ]).then(([devs, saved, installed, s, apps]) => {
       setDevices(devs);
       setAudioApps(apps);
@@ -74,13 +75,13 @@ export default function App() {
 
   useEffect(() => {
     if (!loaded.current) return;
-    window.electronAPI.saveTunnels(tunnels);
+    tauriAPI.saveTunnels(tunnels);
   }, [tunnels]);
 
   // Poll for newly started audio apps every 3 s so the user doesn't need to restart.
   useEffect(() => {
     const id = setInterval(async () => {
-      const apps = await window.electronAPI.getAudioApps();
+      const apps = await tauriAPI.getAudioApps();
       setAudioApps((prev) => {
         if (
           prev.length === apps.length &&
@@ -116,7 +117,7 @@ export default function App() {
   }, []);
 
   const deleteTunnel = useCallback(async (id: string) => {
-    await window.electronAPI.destroyTunnel(id);
+    await tauriAPI.destroyTunnel(id);
     setTunnels((prev) => prev.filter((t) => t.id !== id));
     updateQueues.current.delete(id);
   }, []);
@@ -133,7 +134,7 @@ export default function App() {
     (updated: Tunnel) => {
       enqueue(updated.id, async () => {
         setTunnels((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
-        await window.electronAPI.destroyTunnel(updated.id);
+        await tauriAPI.destroyTunnel(updated.id);
       });
     },
     [enqueue],
@@ -162,7 +163,7 @@ export default function App() {
           readyInputs.length > 0 &&
           next.outputDeviceId !== null
         ) {
-          await window.electronAPI.createTunnel(
+          await tauriAPI.createTunnel(
             next.id,
             readyInputs.map((inp) => ({
               deviceId: inp.deviceId ?? 0,
@@ -178,9 +179,9 @@ export default function App() {
               release: next.duckingRelease,
             },
           );
-          await window.electronAPI.setTunnelMuted(next.id, next.muted);
+          await tauriAPI.setTunnelMuted(next.id, next.muted);
         } else {
-          await window.electronAPI.destroyTunnel(next.id);
+          await tauriAPI.destroyTunnel(next.id);
         }
       });
     },
@@ -195,7 +196,7 @@ export default function App() {
         if (!current?.active) return;
         const next: Tunnel = { ...current, muted: !current.muted };
         setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
-        await window.electronAPI.setTunnelMuted(next.id, next.muted);
+        await tauriAPI.setTunnelMuted(next.id, next.muted);
       });
     },
     [enqueue],
@@ -205,7 +206,7 @@ export default function App() {
   const setTunnelGain = useCallback((id: string, gain: number) => {
     setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, gain } : t)));
     const current = tunnelsRef.current.find((t) => t.id === id);
-    if (current?.active) window.electronAPI.setTunnelGain(id, gain);
+    if (current?.active) tauriAPI.setTunnelGain(id, gain);
   }, []);
 
   // Set per-input gain — live update, no tunnel restart needed.
@@ -222,7 +223,7 @@ export default function App() {
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
       if (current?.active)
-        window.electronAPI.setTunnelInputGain(id, inputIndex, gain);
+        tauriAPI.setTunnelInputGain(id, inputIndex, gain);
     },
     [],
   );
@@ -241,7 +242,7 @@ export default function App() {
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
       if (current?.active)
-        window.electronAPI.setTunnelInputPriority(id, inputIndex, priority);
+        tauriAPI.setTunnelInputPriority(id, inputIndex, priority);
     },
     [],
   );
@@ -263,7 +264,7 @@ export default function App() {
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
       if (current?.active) {
-        window.electronAPI.setTunnelDucking(id, {
+        tauriAPI.setTunnelDucking(id, {
           enabled: duckingEnabled,
           amount: duckingAmount,
           release: duckingRelease,
@@ -296,19 +297,19 @@ export default function App() {
       active: false,
       muted: false,
     }));
-    await window.electronAPI.exportLayout(JSON.stringify(snapshot, null, 2));
+    await tauriAPI.exportLayout(JSON.stringify(snapshot, null, 2));
   }, []);
 
   // Import layout from a JSON file — replaces all cables, stops active ones first.
   const importLayout = useCallback(async () => {
-    const raw = await window.electronAPI.importLayout();
+    const raw = await tauriAPI.importLayout();
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return;
       // Destroy all active tunnels before replacing state
       for (const t of tunnelsRef.current) {
-        if (t.active) await window.electronAPI.destroyTunnel(t.id);
+        if (t.active) await tauriAPI.destroyTunnel(t.id);
       }
       const imported: Tunnel[] = parsed.map((t: Record<string, unknown>) => {
         const inputs: TunnelInput[] =
@@ -370,7 +371,7 @@ export default function App() {
     setInstallError("");
     setVbModalOpen(false);
 
-    const unsub = window.electronAPI.onVBAudioProgress((stage, pct) => {
+    const unsub = tauriAPI.onVBAudioProgress((stage, pct) => {
       if (stage === "downloading") {
         setInstallState("downloading");
         setInstallPct(pct ?? 0);
@@ -379,7 +380,7 @@ export default function App() {
     });
 
     try {
-      await window.electronAPI.downloadAndInstallVBAudio();
+      await tauriAPI.downloadAndInstallVBAudio();
       setInstallState("done");
     } catch (e: unknown) {
       setInstallError(e instanceof Error ? e.message : String(e));
@@ -391,15 +392,15 @@ export default function App() {
 
   // Fallback: open browser page if direct download fails
   const handleOpenPage = useCallback(async () => {
-    await window.electronAPI.installVBAudio();
+    await tauriAPI.installVBAudio();
     setVbModalOpen(false);
   }, []);
 
   const rescanDevices = useCallback(async () => {
     const [devs, installed, apps] = await Promise.all([
-      window.electronAPI.getDevices(),
-      window.electronAPI.checkVBAudioInstalled(),
-      window.electronAPI.getAudioApps(),
+      tauriAPI.getDevices(),
+      tauriAPI.checkVBAudioInstalled(),
+      tauriAPI.getAudioApps(),
     ]);
     setDevices(devs);
     setAudioApps(apps);
@@ -610,7 +611,7 @@ export default function App() {
         open={settingsOpen}
         onClose={() => {
           setSettingsOpen(false);
-          window.electronAPI.loadSettings().then(setSettings);
+          tauriAPI.loadSettings().then(setSettings);
         }}
       />
 

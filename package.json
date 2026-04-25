@@ -9,16 +9,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "tauri": "tauri",
+    "tauri": "tauri dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "types": "tsc --noEmit"
+    "types": "tsc --noEmit",
+    "tauri:build": "tauri build",
+    "tauri:build:portable": "tauri build --bundles nsis --config \"{\\\"bundle\\\": {\\\"windows\\\": {\\\"nsis\\\": {\\\"portable\\\": true}}}}\""
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
+    "@tauri-apps/cli": "^2.10.1",
     "@types/adm-zip": "^0.5.8",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/node": "^25.5.2",
@@ -38,6 +41,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.7.0",
+    "@tauri-apps/plugin-fs": "^2.5.0",
     "adm-zip": "^0.5.17",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",

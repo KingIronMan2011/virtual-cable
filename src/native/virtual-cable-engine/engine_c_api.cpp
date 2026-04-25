@@ -101,13 +101,15 @@ int engine_get_tunnel_channel_count(const char* tunnel_id) {
 }
 
 static engine_level_cb g_c_level_cb = nullptr;
+static void* g_c_level_user_data = nullptr;
 
-void engine_set_level_callback(engine_level_cb cb) {
+void engine_set_level_callback(engine_level_cb cb, void* user_data) {
     g_c_level_cb = cb;
+    g_c_level_user_data = user_data;
     if (cb) {
         Engine::setLevelCallback([](const std::string& tunnel_id, float level) {
             if (g_c_level_cb) {
-                g_c_level_cb(tunnel_id.c_str(), level);
+                g_c_level_cb(tunnel_id.c_str(), level, g_c_level_user_data);
             }
         });
     } else {

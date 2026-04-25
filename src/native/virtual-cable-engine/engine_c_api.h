@@ -50,8 +50,8 @@ int engine_get_tunnel_sample_rate(const char* tunnel_id);
 int engine_get_tunnel_channel_count(const char* tunnel_id);
 
 // Metering callback
-typedef void (*engine_level_cb)(const char* tunnel_id, float level);
-void engine_set_level_callback(engine_level_cb cb);
+typedef void (*engine_level_cb)(const char* tunnel_id, float level, void* user_data);
+void engine_set_level_callback(engine_level_cb cb, void* user_data);
 
 #ifdef __cplusplus
 }

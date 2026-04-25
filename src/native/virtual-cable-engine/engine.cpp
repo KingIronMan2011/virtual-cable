@@ -11,6 +11,9 @@
  */
 
 #include "engine.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 
 
 #include <cstdio>

@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import type { AudioDevice, Tunnel } from "../../types";
+import { tauriAPI } from "../tauriAPI";
 
 interface Props {
   tunnel: Tunnel;
@@ -114,7 +115,7 @@ export default function TunnelCard({
       vuBarRef.current.style.width = "0%";
       return;
     }
-    const unsub = window.electronAPI.onAudioLevel((id, level) => {
+    const unsub = tauriAPI.onAudioLevel((id, level) => {
       if (id !== tunnel.id || !vuBarRef.current) return;
       vuBarRef.current.style.width = `${level * 100}%`;
     });
@@ -132,11 +133,11 @@ export default function TunnelCard({
     }
     let cancelled = false;
     if (expSampleRate) {
-      window.electronAPI.getTunnelSampleRate(tunnel.id).then((v) => {
+      tauriAPI.getTunnelSampleRate(tunnel.id).then((v) => {
         if (!cancelled) setSampleRate(v);
       });
     }
-    window.electronAPI.getTunnelChannelCount(tunnel.id).then((v) => {
+    tauriAPI.getTunnelChannelCount(tunnel.id).then((v) => {
       if (!cancelled) setActiveChannelCount(v);
     });
     return () => {
