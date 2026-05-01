@@ -75,7 +75,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
     try {
       const result = await tauriAPI.checkForUpdates();
       setUpdateState(result);
-      
+
       // Auto-dismiss "up to date" message after 3 seconds
       if (result.status === "not-available") {
         setTimeout(() => setUpdateState({ status: "idle" }), 3000);

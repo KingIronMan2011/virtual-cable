@@ -85,20 +85,20 @@ export const tauriAPI = {
       }
       return { status: "not-available" };
     } catch (error) {
-      return { 
-        status: "error", 
-        error: error instanceof Error ? error.message : "Update check failed" 
+      return {
+        status: "error",
+        error: error instanceof Error ? error.message : "Update check failed",
       };
     }
   },
-  
+
   installUpdate: async (): Promise<void> => {
     const update = await check();
     if (update) {
       await update.downloadAndInstall();
     }
   },
-  
+
   getUpdateState: async (): Promise<UpdateState> => {
     const update = await check();
     if (!update) {
@@ -109,7 +109,7 @@ export const tauriAPI = {
     }
     return { status: "not-available" };
   },
-  
+
   onUpdateStatus: (_cb: (state: UpdateState) => void) => () => {},
 
   getTunnelSampleRate: (id: string): Promise<number | null> =>
