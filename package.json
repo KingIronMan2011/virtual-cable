@@ -2,21 +2,17 @@
   "name": "virtual-cable",
   "version": "1.1.2",
   "description": "Virtual Cable desktop application",
-  "author": "Julian Speckmann",
-  "license": "MIT",
-  "type": "commonjs",
-  "main": ".vite/build/main.js",
+  "author": "KingIronMan2011",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tauri dev",
     "build": "tauri build",
-    "tauri": "tauri dev",
+    "build:portable": "tauri build --bundles nsis --config \"{\\\"bundle\\\": {\\\"windows\\\": {\\\"nsis\\\": {\\\"portable\\\": true}}}}\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "types": "tsc --noEmit",
-    "tauri:build": "tauri build",
-    "tauri:build:portable": "tauri build --bundles nsis --config \"{\\\"bundle\\\": {\\\"windows\\\": {\\\"nsis\\\": {\\\"portable\\\": true}}}}\""
+    "types": "tsc --noEmit"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
