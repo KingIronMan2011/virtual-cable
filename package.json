@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "dotenv -- tauri build",
     "build:portable": "tauri build --bundles nsis --config \"{\\\"bundle\\\": {\\\"windows\\\": {\\\"nsis\\\": {\\\"portable\\\": true}}}}\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -24,6 +24,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
