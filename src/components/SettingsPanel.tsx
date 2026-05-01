@@ -82,7 +82,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
       }
     } catch (error) {
       setUpdateState({
-        status: "error"
+        status: "error",
       });
       setTimeout(() => setUpdateState({ status: "idle" }), 3000);
     }
