@@ -55,6 +55,11 @@ jobs:
         # postinstall runs electron-rebuild for naudiodon + segfault-handler
         run: npm ci
 
+      - name: Set Variables
+        run: |
+          $env:TAURI_SIGNING_PRIVATE_KEY=${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
       - name: Build installer
         run: npm run build
 

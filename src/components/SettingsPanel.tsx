@@ -80,7 +80,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
       if (result.status === "not-available") {
         setTimeout(() => setUpdateState({ status: "idle" }), 3000);
       }
-    } catch (error) {
+    } catch {
       setUpdateState({
         status: "error",
       });
