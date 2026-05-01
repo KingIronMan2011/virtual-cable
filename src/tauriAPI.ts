@@ -73,8 +73,8 @@ export const tauriAPI = {
     invoke("save_settings", { settings }),
 
   // Mocked updater for now
-  checkForUpdates: (): Promise<void> => Promise.resolve(),
-  installUpdate: (): Promise<void> => Promise.resolve(),
+  checkForUpdates: (): Promise<void> => invoke("check_for_updates"),
+  installUpdate: (): Promise<void> => invoke("install_update"),
   getUpdateState: (): Promise<UpdateState> =>
     Promise.resolve({ status: "idle" }),
   onUpdateStatus: (_cb: (state: UpdateState) => void) => () => {},

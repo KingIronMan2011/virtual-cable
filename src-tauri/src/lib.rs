@@ -298,6 +298,27 @@ fn save_settings(app: AppHandle, settings: serde_json::Value) {
     let _ = fs::write(path, content);
 }
 
+// --- Updater ---
+
+#[tauri::command]
+async fn check_for_updates(app: AppHandle) -> Result<(), String> {
+    tauri::updater(app)
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    let updater = tauri::updater(app);
+    updater
+        .download_and_install()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -430,6 +451,8 @@ pub fn run() {
             save_tunnels,
             load_settings,
             save_settings,
+            check_for_updates,
+            install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

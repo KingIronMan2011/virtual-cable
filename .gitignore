@@ -177,3 +177,6 @@ desktop.ini
 # Test coverage
 coverage/
 .nyc_output/
+
+# Updater Keys
+UPDATER_SECRET.key
