@@ -36,7 +36,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── 2a. Build the Windows installer ───────────────────────────────────────
+  # ── 2. Build the Windows installer ───────────────────────────────────────
   build-windows:
     name: Build — Windows
     needs: prepare
@@ -54,71 +54,25 @@ jobs:
       - name: Install dependencies
         # postinstall runs electron-rebuild for naudiodon + segfault-handler
         run: npm ci
-        env:
-          npm_config_msvs_version: "2022"
-
-      - name: Build icons
-        run: npm run build:icons
 
       - name: Build installer
-        run: npm run make
-        env:
-          npm_config_msvs_version: "2022"
+        run: npm run build
 
       - name: List build output
         shell: bash
-        run: find out/make -type f | sort
+        run: find src-tauri/target/release/bundle/nsis -type f | sort
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: squirrel-windows
-          path: out/make/squirrel.windows/x64/
-          if-no-files-found: error
-
-  # ── 2b. Build the macOS zip (arm64 / Apple Silicon) ─────────────────────────
-  # Intel macOS runners (macos-13) are being phased out on GitHub Actions.
-  # arm64 covers all Apple Silicon Macs; Intel users can run it via Rosetta 2.
-  build-macos:
-    name: Build — macOS (arm64)
-    needs: prepare
-    if: needs.prepare.outputs.should_build == 'true'
-    runs-on: macos-latest
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Rebuild native addons for arm64
-        run: npx electron-rebuild -f -w naudiodon,segfault-handler,app-capture --arch arm64
-
-      - name: Build icons
-        run: npm run build:icons
-
-      - name: Build arm64 zip
-        run: npm run make -- --arch arm64
-
-      - name: List build output
-        run: find out/make -type f | sort
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: zip-macos
-          path: out/make/zip/darwin/arm64/
+          name: Virtual Cable_${{ needs.prepare.outputs.version }}_x64-setup
+          path: src-tauri/target/release/bundle/nsis
           if-no-files-found: error
 
   # ── 3. Publish the GitHub release ─────────────────────────────────────────
   release:
     name: Release
-    needs: [prepare, build-windows, build-macos]
+    needs: [prepare, build-windows]
     if: needs.prepare.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
