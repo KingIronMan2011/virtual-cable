@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { check } from "@tauri-apps/plugin-updater";
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "./types";
 
 export const tauriAPI = {
@@ -80,7 +81,7 @@ export const tauriAPI = {
       if (!update) {
         return { status: "not-available" };
       }
-      if (update.available) {
+      if (update) {
         return { status: "available", version: update.version };
       }
       return { status: "not-available" };
@@ -96,6 +97,7 @@ export const tauriAPI = {
     const update = await check();
     if (update) {
       await update.downloadAndInstall();
+      await relaunch();
     }
   },
 
@@ -104,7 +106,7 @@ export const tauriAPI = {
     if (!update) {
       return { status: "idle" };
     }
-    if (update.available) {
+    if (update) {
       return { status: "available", version: update.version };
     }
     return { status: "not-available" };
