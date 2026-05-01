@@ -180,3 +180,7 @@ coverage/
 
 # Updater Keys
 UPDATER_SECRET.key
+
+# Generated files
+website/public/updates.json
+
