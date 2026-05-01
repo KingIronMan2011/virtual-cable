@@ -3,8 +3,5 @@
   "version": "1.0.0",
   "description": "Native C++ audio engine for Virtual Cable",
   "main": "./build/Release/virtual_cable_engine.node",
-  "private": true,
-  "scripts": {
-    "install": "echo Skipping auto-build; rebuild.js handles this"
-  }
+  "private": true
 }

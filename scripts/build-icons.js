@@ -8,13 +8,16 @@
  * Run:  node scripts/build-icons.js
  * Or:   npm run build:icons
  */
+import sharp from "sharp";
+import pngToIco from "png-to-ico";
+import { execFileSync } from "child_process";
+import fs from "fs";
+import os from "os";
+import path from "pathe";
+import { fileURLToPath } from "url";
 
-const sharp = require("sharp");
-const pngToIco = require("png-to-ico");
-const { execFileSync } = require("child_process");
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const icoFn = pngToIco.default ?? pngToIco;
 
