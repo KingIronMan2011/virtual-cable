@@ -35,7 +35,7 @@ const EXTRA_ICONS = [
   { name: "Square284x284Logo.png", size: 284 },
   { name: "Square310x310Logo.png", size: 310 },
 
-  { name: "StoreLogo.png", size: 50 }
+  { name: "StoreLogo.png", size: 50 },
 ];
 
 async function buildIco() {
@@ -46,7 +46,7 @@ async function buildIco() {
         const p = path.join(tmp, `icon-${s}.png`);
         await sharp(SVG).resize(s, s).png().toFile(p);
         return p;
-      })
+      }),
     );
 
     const ico = await icoFn(paths);
@@ -58,10 +58,7 @@ async function buildIco() {
 }
 
 async function buildPng() {
-  await sharp(SVG)
-    .resize(512, 512)
-    .png()
-    .toFile(path.join(OUT, "icon.png"));
+  await sharp(SVG).resize(512, 512).png().toFile(path.join(OUT, "icon.png"));
 
   console.log("✓ icon.png");
 }
@@ -84,8 +81,8 @@ async function buildIcns() {
       sharp(SVG)
         .resize(s * 2, s * 2)
         .png()
-        .toFile(path.join(iconset, `icon_${s}x${s}@2x.png`))
-    ])
+        .toFile(path.join(iconset, `icon_${s}x${s}@2x.png`)),
+    ]),
   );
 
   execFileSync("iconutil", [
@@ -93,7 +90,7 @@ async function buildIcns() {
     "icns",
     iconset,
     "-o",
-    path.join(OUT, "icon.icns")
+    path.join(OUT, "icon.icns"),
   ]);
 
   fs.rmSync(iconset, { recursive: true });
@@ -103,11 +100,8 @@ async function buildIcns() {
 async function buildExtraIcons() {
   await Promise.all(
     EXTRA_ICONS.map(({ name, size }) =>
-      sharp(SVG)
-        .resize(size, size)
-        .png()
-        .toFile(path.join(OUT, name))
-    )
+      sharp(SVG).resize(size, size).png().toFile(path.join(OUT, name)),
+    ),
   );
 
   console.log("✓ extra icons");
@@ -116,12 +110,7 @@ async function buildExtraIcons() {
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
 
-  await Promise.all([
-    buildIco(),
-    buildPng(),
-    buildIcns(),
-    buildExtraIcons()
-  ]);
+  await Promise.all([buildIco(), buildPng(), buildIcns(), buildExtraIcons()]);
 }
 
 main().catch((err) => {
