@@ -437,7 +437,6 @@ export default function App() {
       <header className="app-header">
         <div className="header-brand">
           <span className="brand-mark">VIRTUAL CABLE</span>
-          <span className="brand-ver">patchbay v1</span>
         </div>
 
         <div className="header-meta">
