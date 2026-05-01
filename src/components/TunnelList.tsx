@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AudioDevice, Tunnel } from "../../types";
+import type { AudioDevice, Tunnel } from "../types";
 import TunnelCard from "./TunnelCard";
 
 interface Props {

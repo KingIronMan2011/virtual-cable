@@ -67,8 +67,6 @@ web_modules/
 
 # dotenv environment variable files
 .env
-.env.*
-!.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -138,11 +136,44 @@ dist
 !.yarn/sdks
 !.yarn/versions
 
-# Vite files
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
-.vite/
-
 # Cloudflare Workers
 wrangler.toml
 .wrangler/
+
+# ============= Project-Specific =============
+
+# Tauri
+src-tauri/target/
+Cargo.lock
+.tauri-cli
+
+# Vite build output
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+.Spotlight-V100
+.Trashes
+
+# Editor/temp files
+*~
+*.bak
+*.tmp
+*.swp
+*.swo
+
+# Local environment files
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+.nyc_output/

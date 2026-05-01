@@ -1,4 +1,3 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   AlertCircle,
@@ -12,11 +11,19 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import type {
+  AudioDevice,
+  Tunnel,
+  TunnelInput,
+  InstallState,
+  AppSettings,
+} from "./types";
 import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
 import SettingsPanel from "./components/SettingsPanel";
 import { tauriAPI } from "./tauriAPI";
-const SETTINGS_DEFAULTS = {
+
+const SETTINGS_DEFAULTS: AppSettings = {
   autoUpdate: false,
   minimizeToTray: false,
   experimentalFeatures: false,
@@ -24,27 +31,31 @@ const SETTINGS_DEFAULTS = {
   bufferSize: 512,
   expSampleRate: false,
 };
+
 export default function App() {
-  const [devices, setDevices] = useState([]);
-  const [audioApps, setAudioApps] = useState([]);
-  const [tunnels, setTunnels] = useState([]);
-  const [settings, setSettings] = useState(SETTINGS_DEFAULTS);
-  const [vbInstalled, setVbInstalled] = useState(null);
+  const [devices, setDevices] = useState<AudioDevice[]>([]);
+  const [audioApps, setAudioApps] = useState<
+    { pid: number; name: string; exe: string }[]
+  >([]);
+  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
+  const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
   const [vbModalOpen, setVbModalOpen] = useState(false);
   const [vbToastDismissed, setVbToastDismissed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [installState, setInstallState] = useState("idle");
+  const [installState, setInstallState] = useState<InstallState>("idle");
   const [installPct, setInstallPct] = useState(0);
   const [installError, setInstallError] = useState("");
   const loaded = useRef(false);
   // Per-tunnel serial queue — each call chains off the previous so IPC messages
   // for the same tunnel always arrive in the order the user triggered them.
-  const updateQueues = useRef(new Map());
+  const updateQueues = useRef(new Map<string, Promise<void>>());
   // Mirror of `tunnels` state, updated synchronously on every render.
   // Queue operations read from this ref at execution time (after all prior async
   // IPC calls resolve and React has re-rendered), so they always see fresh state.
-  const tunnelsRef = useRef([]);
+  const tunnelsRef = useRef<Tunnel[]>([]);
   tunnelsRef.current = tunnels;
+
   useEffect(() => {
     Promise.all([
       tauriAPI.getDevices(),
@@ -55,16 +66,21 @@ export default function App() {
     ]).then(([devs, saved, installed, s, apps]) => {
       setDevices(devs);
       setAudioApps(apps);
-      setTunnels(saved);
+      // Ensure tunnels start in an inactive state upon app launch
+      setTunnels(saved.map((t) => ({ ...t, active: false, muted: false })));
       setVbInstalled(installed);
       setSettings(s);
       loaded.current = true;
     });
   }, []);
+
   useEffect(() => {
     if (!loaded.current) return;
-    tauriAPI.saveTunnels(tunnels);
+    // Always save tunnels as inactive so they don't auto-start on next launch
+    const toSave = tunnels.map((t) => ({ ...t, active: false, muted: false }));
+    tauriAPI.saveTunnels(toSave);
   }, [tunnels]);
+
   // Poll for newly started audio apps every 3 s so the user doesn't need to restart.
   useEffect(() => {
     const id = setInterval(async () => {
@@ -80,6 +96,7 @@ export default function App() {
     }, 3000);
     return () => clearInterval(id);
   }, []);
+
   const addTunnel = useCallback(() => {
     setTunnels((prev) => {
       const n = prev.length + 1;
@@ -101,20 +118,23 @@ export default function App() {
       ];
     });
   }, []);
-  const deleteTunnel = useCallback(async (id) => {
+
+  const deleteTunnel = useCallback(async (id: string) => {
     await tauriAPI.destroyTunnel(id);
     setTunnels((prev) => prev.filter((t) => t.id !== id));
     updateQueues.current.delete(id);
   }, []);
+
   // Enqueue an async operation for a tunnel onto its serial queue.
   // One failure swallows so it doesn't stall subsequent operations.
-  const enqueue = useCallback((id, op) => {
+  const enqueue = useCallback((id: string, op: () => Promise<void>) => {
     const tail = (updateQueues.current.get(id) ?? Promise.resolve()).then(op);
     updateQueues.current.set(id, tail.catch(console.error));
   }, []);
+
   // Device-change: always deactivates the tunnel, no IPC needed beyond destroy.
   const updateTunnel = useCallback(
-    (updated) => {
+    (updated: Tunnel) => {
       enqueue(updated.id, async () => {
         setTunnels((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
         await tauriAPI.destroyTunnel(updated.id);
@@ -122,14 +142,15 @@ export default function App() {
     },
     [enqueue],
   );
+
   // Toggle active — reads from tunnelsRef at execution time so it always sees
   // the state committed by all previously-resolved queue operations.
   const toggleTunnelActive = useCallback(
-    (id) => {
+    (id: string) => {
       enqueue(id, async () => {
         const current = tunnelsRef.current.find((t) => t.id === id);
         if (!current) return;
-        const next = {
+        const next: Tunnel = {
           ...current,
           active: !current.active,
           // clear mute when going offline so it doesn't persist into next session
@@ -169,57 +190,73 @@ export default function App() {
     },
     [enqueue],
   );
+
   // Toggle mute — reads from tunnelsRef at execution time.
   const toggleTunnelMute = useCallback(
-    (id) => {
+    (id: string) => {
       enqueue(id, async () => {
         const current = tunnelsRef.current.find((t) => t.id === id);
         if (!current?.active) return;
-        const next = { ...current, muted: !current.muted };
+        const next: Tunnel = { ...current, muted: !current.muted };
         setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
         await tauriAPI.setTunnelMuted(next.id, next.muted);
       });
     },
     [enqueue],
   );
+
   // Set master gain — live update, no tunnel restart needed.
-  const setTunnelGain = useCallback((id, gain) => {
+  const setTunnelGain = useCallback((id: string, gain: number) => {
     setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, gain } : t)));
     const current = tunnelsRef.current.find((t) => t.id === id);
     if (current?.active) tauriAPI.setTunnelGain(id, gain);
   }, []);
+
   // Set per-input gain — live update, no tunnel restart needed.
-  const setTunnelInputGain = useCallback((id, inputIndex, gain) => {
-    setTunnels((ts) =>
-      ts.map((t) => {
-        if (t.id !== id) return t;
-        const inputs = t.inputs.map((inp, i) =>
-          i === inputIndex ? { ...inp, gain } : inp,
-        );
-        return { ...t, inputs };
-      }),
-    );
-    const current = tunnelsRef.current.find((t) => t.id === id);
-    if (current?.active) tauriAPI.setTunnelInputGain(id, inputIndex, gain);
-  }, []);
+  const setTunnelInputGain = useCallback(
+    (id: string, inputIndex: number, gain: number) => {
+      setTunnels((ts) =>
+        ts.map((t) => {
+          if (t.id !== id) return t;
+          const inputs = t.inputs.map((inp, i) =>
+            i === inputIndex ? { ...inp, gain } : inp,
+          );
+          return { ...t, inputs };
+        }),
+      );
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (current?.active) tauriAPI.setTunnelInputGain(id, inputIndex, gain);
+    },
+    [],
+  );
+
   // Set input priority — live update, no tunnel restart needed.
-  const setTunnelInputPriority = useCallback((id, inputIndex, priority) => {
-    setTunnels((ts) =>
-      ts.map((t) => {
-        if (t.id !== id) return t;
-        const inputs = t.inputs.map((inp, i) =>
-          i === inputIndex ? { ...inp, priority } : inp,
-        );
-        return { ...t, inputs };
-      }),
-    );
-    const current = tunnelsRef.current.find((t) => t.id === id);
-    if (current?.active)
-      tauriAPI.setTunnelInputPriority(id, inputIndex, priority);
-  }, []);
+  const setTunnelInputPriority = useCallback(
+    (id: string, inputIndex: number, priority: boolean) => {
+      setTunnels((ts) =>
+        ts.map((t) => {
+          if (t.id !== id) return t;
+          const inputs = t.inputs.map((inp, i) =>
+            i === inputIndex ? { ...inp, priority } : inp,
+          );
+          return { ...t, inputs };
+        }),
+      );
+      const current = tunnelsRef.current.find((t) => t.id === id);
+      if (current?.active)
+        tauriAPI.setTunnelInputPriority(id, inputIndex, priority);
+    },
+    [],
+  );
+
   // Set ducking config — live update, no tunnel restart needed.
   const setTunnelDucking = useCallback(
-    (id, duckingEnabled, duckingAmount, duckingRelease) => {
+    (
+      id: string,
+      duckingEnabled: boolean,
+      duckingAmount: number,
+      duckingRelease: number,
+    ) => {
       setTunnels((ts) =>
         ts.map((t) =>
           t.id !== id
@@ -238,12 +275,14 @@ export default function App() {
     },
     [],
   );
+
   // Rename — only touches the name, never restarts the stream.
-  const renameTunnel = useCallback((id, name) => {
+  const renameTunnel = useCallback((id: string, name: string) => {
     setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, name } : t)));
   }, []);
+
   // Reorder via drag-and-drop.
-  const reorderTunnels = useCallback((from, to) => {
+  const reorderTunnels = useCallback((from: number, to: number) => {
     if (from === to) return;
     setTunnels((prev) => {
       const next = [...prev];
@@ -252,6 +291,7 @@ export default function App() {
       return next;
     });
   }, []);
+
   // Export current layout to a user-chosen JSON file.
   const exportLayout = useCallback(async () => {
     const snapshot = tunnelsRef.current.map((t) => ({
@@ -261,6 +301,7 @@ export default function App() {
     }));
     await tauriAPI.exportLayout(JSON.stringify(snapshot, null, 2));
   }, []);
+
   // Import layout from a JSON file — replaces all cables, stops active ones first.
   const importLayout = useCallback(async () => {
     const raw = await tauriAPI.importLayout();
@@ -272,10 +313,17 @@ export default function App() {
       for (const t of tunnelsRef.current) {
         if (t.active) await tauriAPI.destroyTunnel(t.id);
       }
-      const imported = parsed.map((t) => {
-        const inputs =
+      const imported: Tunnel[] = parsed.map((t: Record<string, unknown>) => {
+        const inputs: TunnelInput[] =
           Array.isArray(t.inputs) && t.inputs.length > 0
-            ? t.inputs.map((inp) => ({
+            ? (
+                t.inputs as {
+                  deviceId?: unknown;
+                  appPid?: unknown;
+                  gain?: unknown;
+                  priority?: unknown;
+                }[]
+              ).map((inp) => ({
                 deviceId:
                   typeof inp.deviceId === "number" ? inp.deviceId : null,
                 appPid: typeof inp.appPid === "number" ? inp.appPid : null,
@@ -318,11 +366,13 @@ export default function App() {
       // Silently ignore malformed files
     }
   }, []);
+
   const handleDownloadInstall = useCallback(async () => {
     setInstallState("downloading");
     setInstallPct(0);
     setInstallError("");
     setVbModalOpen(false);
+
     const unsub = tauriAPI.onVBAudioProgress((stage, pct) => {
       if (stage === "downloading") {
         setInstallState("downloading");
@@ -330,21 +380,24 @@ export default function App() {
       } else if (stage === "extracting") setInstallState("extracting");
       else if (stage === "launching") setInstallState("launching");
     });
+
     try {
       await tauriAPI.downloadAndInstallVBAudio();
       setInstallState("done");
-    } catch (e) {
+    } catch (e: unknown) {
       setInstallError(e instanceof Error ? e.message : String(e));
       setInstallState("error");
     } finally {
       unsub();
     }
   }, []);
+
   // Fallback: open browser page if direct download fails
   const handleOpenPage = useCallback(async () => {
     await tauriAPI.installVBAudio();
     setVbModalOpen(false);
   }, []);
+
   const rescanDevices = useCallback(async () => {
     const [devs, installed, apps] = await Promise.all([
       tauriAPI.getDevices(),
@@ -356,17 +409,21 @@ export default function App() {
     setVbInstalled(installed);
     if (installed) setVbToastDismissed(false);
   }, []);
+
   // Auto-rescan when the window regains focus so newly installed
   // VB-Audio devices appear without a manual rescan or restart
   useEffect(() => {
     window.addEventListener("focus", rescanDevices);
     return () => window.removeEventListener("focus", rescanDevices);
   }, [rescanDevices]);
+
   const activeCableCount = tunnels.filter((t) => t.active).length;
+
   const showToast =
     vbInstalled === false && !vbToastDismissed && installState === "idle";
   const showProgress = installState !== "idle" && installState !== "done";
-  const progressLabel = {
+
+  const progressLabel: Record<InstallState, string> = {
     idle: "",
     downloading: `Downloading… ${installPct}%`,
     extracting: "Extracting…",
@@ -374,246 +431,198 @@ export default function App() {
     done: "",
     error: `Error: ${installError}`,
   };
-  return _jsxs("div", {
-    className: "app-root",
-    children: [
-      _jsxs("header", {
-        className: "app-header",
-        children: [
-          _jsxs("div", {
-            className: "header-brand",
-            children: [
-              _jsx("span", {
-                className: "brand-mark",
-                children: "VIRTUAL CABLE",
-              }),
-              _jsx("span", { className: "brand-ver", children: "patchbay v1" }),
-            ],
-          }),
-          _jsxs("div", {
-            className: "header-meta",
-            children: [
-              _jsxs("div", {
-                className: "meta-stat",
-                children: [
-                  _jsx("span", {
-                    className: "meta-val",
-                    children: String(tunnels.length).padStart(2, "0"),
-                  }),
-                  _jsx("span", { className: "meta-label", children: "cables" }),
-                ],
-              }),
-              _jsx("div", { className: "meta-divider" }),
-              _jsxs("div", {
-                className: "meta-stat",
-                children: [
-                  _jsx("span", {
-                    className: `meta-val ${activeCableCount > 0 ? "live" : ""}`,
-                    children: String(activeCableCount).padStart(2, "0"),
-                  }),
-                  _jsx("span", { className: "meta-label", children: "live" }),
-                ],
-              }),
-              _jsx("div", { className: "meta-divider" }),
-              vbInstalled === true
-                ? _jsxs("span", {
-                    className: "meta-vb-ok",
-                    children: [
-                      _jsx(CheckCircle2, { size: 13, strokeWidth: 2.5 }),
-                      "VB-Audio",
-                    ],
-                  })
-                : _jsx("button", {
-                    className: "header-rescan-btn",
-                    onClick: rescanDevices,
-                    title: "Re-scan audio devices",
-                    children: _jsx(RefreshCw, { size: 14, strokeWidth: 2 }),
-                  }),
-              _jsx("div", { className: "meta-divider" }),
-              _jsx("button", {
-                className: "header-settings-btn",
-                onClick: exportLayout,
-                title: "Export cable layout",
-                children: _jsx(Download, { size: 14, strokeWidth: 1.75 }),
-              }),
-              _jsx("button", {
-                className: "header-settings-btn",
-                onClick: importLayout,
-                title: "Import cable layout",
-                children: _jsx(Upload, { size: 14, strokeWidth: 1.75 }),
-              }),
-              _jsx("div", { className: "meta-divider" }),
-              _jsx("button", {
-                className: "header-settings-btn",
-                onClick: () => setSettingsOpen(true),
-                title: "Settings",
-                children: _jsx(Settings, { size: 15, strokeWidth: 1.75 }),
-              }),
-            ],
-          }),
-        ],
-      }),
-      _jsx("main", {
-        className: "app-main",
-        children: _jsx("div", {
-          className: "cables-container",
-          children: _jsx(TunnelList, {
-            tunnels: tunnels,
-            devices: devices,
-            audioApps: audioApps,
-            onUpdate: updateTunnel,
-            onToggleActive: toggleTunnelActive,
-            onToggleMute: toggleTunnelMute,
-            onSetGain: setTunnelGain,
-            onSetInputGain: setTunnelInputGain,
-            onSetInputPriority: setTunnelInputPriority,
-            onSetDucking: setTunnelDucking,
-            onRename: renameTunnel,
-            onReorder: reorderTunnels,
-            onDelete: deleteTunnel,
-            expSampleRate:
-              settings.experimentalFeatures && settings.expSampleRate,
-          }),
-        }),
-      }),
-      _jsxs("button", {
-        className: "fab-new",
-        onClick: addTunnel,
-        children: [_jsx(Plus, { size: 14, strokeWidth: 2.5 }), "New Cable"],
-      }),
-      showToast &&
-        _jsxs("div", {
-          className: "vb-toast",
-          children: [
-            _jsx("div", {
-              className: "vb-toast-content",
-              children: _jsxs("div", {
-                className: "vb-toast-row",
-                children: [
-                  _jsx("span", {
-                    className: "vb-toast-icon",
-                    children: _jsx(Hexagon, { size: 18, strokeWidth: 1.5 }),
-                  }),
-                  _jsxs("div", {
-                    className: "vb-toast-text",
-                    children: [
-                      _jsx("span", {
-                        className: "vb-toast-title",
-                        children: "VB-Audio not detected",
-                      }),
-                      _jsx("span", {
-                        className: "vb-toast-sub",
-                        children:
-                          "Required for virtual devices visible to other apps.",
-                      }),
-                    ],
-                  }),
-                ],
-              }),
-            }),
-            _jsxs("div", {
-              className: "vb-toast-actions",
-              children: [
-                _jsxs("button", {
-                  className: "vb-toast-install",
-                  onClick: () => setVbModalOpen(true),
-                  children: [
-                    "Install ",
-                    _jsx(ExternalLink, { size: 12, strokeWidth: 2 }),
-                  ],
-                }),
-                _jsx("button", {
-                  className: "vb-toast-dismiss",
-                  onClick: () => setVbToastDismissed(true),
-                  children: _jsx(X, { size: 14, strokeWidth: 2 }),
-                }),
-              ],
-            }),
-          ],
-        }),
-      showProgress &&
-        _jsxs("div", {
-          className: `vb-toast${installState === "error" ? " is-error" : ""}`,
-          children: [
-            _jsxs("div", {
-              className: "vb-toast-content",
-              children: [
-                _jsxs("div", {
-                  className: "vb-toast-row",
-                  children: [
-                    _jsx("span", {
-                      className: "vb-toast-icon",
-                      children:
-                        installState === "error"
-                          ? _jsx(AlertCircle, { size: 18, strokeWidth: 1.5 })
-                          : _jsx(Hexagon, { size: 18, strokeWidth: 1.5 }),
-                    }),
-                    _jsxs("div", {
-                      className: "vb-toast-text",
-                      children: [
-                        _jsx("span", {
-                          className: "vb-toast-title",
-                          children:
-                            installState === "error"
-                              ? "Install failed"
-                              : "Installing VB-Audio",
-                        }),
-                        _jsx("span", {
-                          className: "vb-toast-sub",
-                          children: progressLabel[installState],
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-                installState === "downloading" &&
-                  _jsx("div", {
-                    className: "vb-toast-bar",
-                    children: _jsx("div", {
-                      className: "vb-toast-bar-fill",
-                      style: { width: `${installPct}%` },
-                    }),
-                  }),
-              ],
-            }),
-            installState === "error" &&
-              _jsxs("div", {
-                className: "vb-toast-actions",
-                children: [
-                  _jsxs("button", {
-                    className: "vb-toast-install",
-                    onClick: handleOpenPage,
-                    children: [
-                      "Open page ",
-                      _jsx(ExternalLink, { size: 12, strokeWidth: 2 }),
-                    ],
-                  }),
-                  _jsx("button", {
-                    className: "vb-toast-dismiss",
-                    onClick: () => {
-                      setInstallState("idle");
-                      setVbToastDismissed(false);
-                    },
-                    children: _jsx(X, { size: 14, strokeWidth: 2 }),
-                  }),
-                ],
-              }),
-          ],
-        }),
-      _jsx(SettingsPanel, {
-        open: settingsOpen,
-        onClose: () => {
+
+  return (
+    <div className="app-root">
+      <header className="app-header">
+        <div className="header-brand">
+          <span className="brand-mark">VIRTUAL CABLE</span>
+          <span className="brand-ver">patchbay v1</span>
+        </div>
+
+        <div className="header-meta">
+          <div className="meta-stat">
+            <span className="meta-val">
+              {String(tunnels.length).padStart(2, "0")}
+            </span>
+            <span className="meta-label">cables</span>
+          </div>
+          <div className="meta-divider" />
+          <div className="meta-stat">
+            <span className={`meta-val ${activeCableCount > 0 ? "live" : ""}`}>
+              {String(activeCableCount).padStart(2, "0")}
+            </span>
+            <span className="meta-label">live</span>
+          </div>
+          <div className="meta-divider" />
+          {vbInstalled === true ? (
+            <span className="meta-vb-ok">
+              <CheckCircle2 size={13} strokeWidth={2.5} />
+              VB-Audio
+            </span>
+          ) : (
+            <button
+              className="header-rescan-btn"
+              onClick={rescanDevices}
+              title="Re-scan audio devices"
+            >
+              <RefreshCw size={14} strokeWidth={2} />
+            </button>
+          )}
+          <div className="meta-divider" />
+          <button
+            className="header-settings-btn"
+            onClick={exportLayout}
+            title="Export cable layout"
+          >
+            <Download size={14} strokeWidth={1.75} />
+          </button>
+          <button
+            className="header-settings-btn"
+            onClick={importLayout}
+            title="Import cable layout"
+          >
+            <Upload size={14} strokeWidth={1.75} />
+          </button>
+          <div className="meta-divider" />
+          <button
+            className="header-settings-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+          >
+            <Settings size={15} strokeWidth={1.75} />
+          </button>
+        </div>
+      </header>
+
+      <main className="app-main">
+        <div className="cables-container">
+          <TunnelList
+            tunnels={tunnels}
+            devices={devices}
+            audioApps={audioApps}
+            onUpdate={updateTunnel}
+            onToggleActive={toggleTunnelActive}
+            onToggleMute={toggleTunnelMute}
+            onSetGain={setTunnelGain}
+            onSetInputGain={setTunnelInputGain}
+            onSetInputPriority={setTunnelInputPriority}
+            onSetDucking={setTunnelDucking}
+            onRename={renameTunnel}
+            onReorder={reorderTunnels}
+            onDelete={deleteTunnel}
+            expSampleRate={
+              settings.experimentalFeatures && settings.expSampleRate
+            }
+          />
+        </div>
+      </main>
+
+      <button className="fab-new" onClick={addTunnel}>
+        <Plus size={14} strokeWidth={2.5} />
+        New Cable
+      </button>
+
+      {/* Idle toast — shown when VB-Audio missing and install not started */}
+      {showToast && (
+        <div className="vb-toast">
+          <div className="vb-toast-content">
+            <div className="vb-toast-row">
+              <span className="vb-toast-icon">
+                <Hexagon size={18} strokeWidth={1.5} />
+              </span>
+              <div className="vb-toast-text">
+                <span className="vb-toast-title">VB-Audio not detected</span>
+                <span className="vb-toast-sub">
+                  Required for virtual devices visible to other apps.
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="vb-toast-actions">
+            <button
+              className="vb-toast-install"
+              onClick={() => setVbModalOpen(true)}
+            >
+              Install <ExternalLink size={12} strokeWidth={2} />
+            </button>
+            <button
+              className="vb-toast-dismiss"
+              onClick={() => setVbToastDismissed(true)}
+            >
+              <X size={14} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Progress / error toast — shown while downloading/installing */}
+      {showProgress && (
+        <div
+          className={`vb-toast${installState === "error" ? " is-error" : ""}`}
+        >
+          <div className="vb-toast-content">
+            <div className="vb-toast-row">
+              <span className="vb-toast-icon">
+                {installState === "error" ? (
+                  <AlertCircle size={18} strokeWidth={1.5} />
+                ) : (
+                  <Hexagon size={18} strokeWidth={1.5} />
+                )}
+              </span>
+              <div className="vb-toast-text">
+                <span className="vb-toast-title">
+                  {installState === "error"
+                    ? "Install failed"
+                    : "Installing VB-Audio"}
+                </span>
+                <span className="vb-toast-sub">
+                  {progressLabel[installState]}
+                </span>
+              </div>
+            </div>
+            {installState === "downloading" && (
+              <div className="vb-toast-bar">
+                <div
+                  className="vb-toast-bar-fill"
+                  style={{ width: `${installPct}%` }}
+                />
+              </div>
+            )}
+          </div>
+          {installState === "error" && (
+            <div className="vb-toast-actions">
+              <button className="vb-toast-install" onClick={handleOpenPage}>
+                Open page <ExternalLink size={12} strokeWidth={2} />
+              </button>
+              <button
+                className="vb-toast-dismiss"
+                onClick={() => {
+                  setInstallState("idle");
+                  setVbToastDismissed(false);
+                }}
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => {
           setSettingsOpen(false);
           tauriAPI.loadSettings().then(setSettings);
-        },
-      }),
-      _jsx(VBInstallModal, {
-        open: vbModalOpen,
-        onInstall: handleDownloadInstall,
-        onOpenPage: handleOpenPage,
-        onDismiss: () => setVbModalOpen(false),
-      }),
-    ],
-  });
+        }}
+      />
+
+      <VBInstallModal
+        open={vbModalOpen}
+        onInstall={handleDownloadInstall}
+        onOpenPage={handleOpenPage}
+        onDismiss={() => setVbModalOpen(false)}
+      />
+    </div>
+  );
 }
-//# sourceMappingURL=App.js.map

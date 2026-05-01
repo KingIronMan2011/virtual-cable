@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "../types";
+import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "./types";
 
 export const tauriAPI = {
   getDevices: (): Promise<AudioDevice[]> => invoke("get_devices"),
@@ -35,7 +35,7 @@ export const tauriAPI = {
   checkVBAudioInstalled: (): Promise<boolean> => Promise.resolve(true),
   installVBAudio: (): Promise<void> => Promise.resolve(),
   downloadAndInstallVBAudio: (): Promise<void> => Promise.resolve(),
-  onVBAudioProgress: (cb: (stage: string, pct?: number) => void) => () => {},
+  onVBAudioProgress: (_cb: (stage: string, pct?: number) => void) => () => {},
 
   loadTunnels: (): Promise<Tunnel[]> => invoke("load_tunnels"),
   saveTunnels: (tunnels: Tunnel[]): Promise<void> =>
@@ -77,7 +77,7 @@ export const tauriAPI = {
   installUpdate: (): Promise<void> => Promise.resolve(),
   getUpdateState: (): Promise<UpdateState> =>
     Promise.resolve({ status: "idle" }),
-  onUpdateStatus: (cb: (state: UpdateState) => void) => () => {},
+  onUpdateStatus: (_cb: (state: UpdateState) => void) => () => {},
 
   getTunnelSampleRate: (id: string): Promise<number | null> =>
     invoke("get_tunnel_sample_rate", { id }),
@@ -112,8 +112,9 @@ export const tauriAPI = {
   onAudioLevel: (
     cb: (tunnelId: string, level: number) => void,
   ): (() => void) => {
-    const unsubPromise = listen("audio-level", (event: any) => {
-      const [tunnelId, level] = event.payload;
+    const unsubPromise = listen("audio-level", (event: unknown) => {
+      const payload = (event as { payload: [string, number] }).payload;
+      const [tunnelId, level] = payload;
       cb(tunnelId, level);
     });
     return () => {

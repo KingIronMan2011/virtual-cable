@@ -9,7 +9,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import type { AudioDevice, Tunnel } from "../../types";
+import type { AudioDevice, Tunnel } from "../types";
 import { tauriAPI } from "../tauriAPI";
 
 interface Props {

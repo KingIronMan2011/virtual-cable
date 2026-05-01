@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { X } from "lucide-react";
-import packageJson from "../../../package.json";
-import type { AppSettings, BufferSize, UpdateState } from "../../types";
+import packageJson from "../../package.json";
+import type { AppSettings, BufferSize, UpdateState } from "../types";
 import { tauriAPI } from "../tauriAPI";
 
 interface Props {

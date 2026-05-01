@@ -365,7 +365,7 @@ pub fn run() {
                     fn SetDllDirectoryW(lpPathName: *const u16) -> i32;
                 }
 
-                let dll_bytes = include_bytes!("../../src/native/virtual-cable-engine/portaudio/bin/portaudio_x64.dll");
+                let dll_bytes = include_bytes!("./native/virtual-cable-engine/portaudio/bin/portaudio_x64.dll");
                 let dll_name = "portaudio_x64.dll";
                 
                 // Try several locations to unpack the DLL

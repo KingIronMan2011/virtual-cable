@@ -2,7 +2,7 @@ fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
 
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let engine_dir = manifest_dir.join("../src/native/virtual-cable-engine");
+    let engine_dir = manifest_dir.join("src/native/virtual-cable-engine");
 
     println!("cargo:rerun-if-changed={}", engine_dir.join("engine.cpp").display());
     println!("cargo:rerun-if-changed={}", engine_dir.join("engine.h").display());

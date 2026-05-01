@@ -6,7 +6,16 @@ import reactHooksPlugin from "eslint-plugin-react-hooks";
 export default tseslint.config(
   // Ignore build output and generated files
   {
-    ignores: [".vite/**", "out/**", "node_modules/**", "forge.config.ts"],
+    ignores: [
+      ".vite/**",
+      "dist/**",
+      "out/**",
+      "node_modules/**",
+      ".git/**",
+      "src-tauri/target/**",
+      "coverage/**",
+      "forge.config.ts",
+    ],
   },
 
   eslint.configs.recommended,

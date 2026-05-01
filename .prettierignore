@@ -1,1 +1,37 @@
+# Build outputs
+dist/
+.vite/
+out/
+coverage/
+
+# Rust/Tauri
 src-tauri/target/
+Cargo.lock
+
+# Node
+node_modules/
+.npm/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package managers
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# Generated/compiled files
+**/*.js.map
+**/*.d.ts.map
