@@ -76,21 +76,14 @@ export const tauriAPI = {
 
   // Updater plugin
   checkForUpdates: async (): Promise<UpdateState> => {
-    try {
-      const update = await check();
-      if (!update) {
-        return { status: "not-available" };
-      }
-      if (update) {
-        return { status: "available", version: update.version };
-      }
+    const update = await check();
+    if (!update) {
       return { status: "not-available" };
-    } catch (error) {
-      return {
-        status: "error",
-        error: error instanceof Error ? error.message : "Update check failed",
-      };
     }
+    if (update) {
+      return { status: "available", version: update.version };
+    }
+    return { status: "not-available" };
   },
 
   installUpdate: async (): Promise<void> => {

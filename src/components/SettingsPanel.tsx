@@ -82,8 +82,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
       }
     } catch (error) {
       setUpdateState({
-        status: "error",
-        error: error instanceof Error ? error.message : "Check failed",
+        status: "error"
       });
       setTimeout(() => setUpdateState({ status: "idle" }), 3000);
     }
