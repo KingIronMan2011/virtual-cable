@@ -12,25 +12,25 @@
 const fs = require("fs");
 const path = require("path");
 
-const vcxproj = path.join(
-  __dirname,
-  "build",
-  "virtual_cable_engine.vcxproj"
-);
+const vcxproj = path.join(__dirname, "build", "virtual_cable_engine.vcxproj");
 
 if (fs.existsSync(vcxproj)) {
   let content = fs.readFileSync(vcxproj, "utf8");
   const before = content;
   content = content.replace(
     /<PlatformToolset>ClangCL<\/PlatformToolset>/g,
-    "<PlatformToolset>v143</PlatformToolset>"
+    "<PlatformToolset>v143</PlatformToolset>",
   );
   if (content !== before) {
     fs.writeFileSync(vcxproj, content, "utf8");
     console.log("[fix-toolset] Patched PlatformToolset: ClangCL -> v143");
   } else {
-    console.log("[fix-toolset] PlatformToolset already correct, no patch needed");
+    console.log(
+      "[fix-toolset] PlatformToolset already correct, no patch needed",
+    );
   }
 } else {
-  console.log("[fix-toolset] No vcxproj found (non-Windows or first run), skipping");
+  console.log(
+    "[fix-toolset] No vcxproj found (non-Windows or first run), skipping",
+  );
 }

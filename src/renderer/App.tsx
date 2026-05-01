@@ -67,7 +67,7 @@ export default function App() {
       setDevices(devs);
       setAudioApps(apps);
       // Ensure tunnels start in an inactive state upon app launch
-      setTunnels(saved.map(t => ({ ...t, active: false, muted: false })));
+      setTunnels(saved.map((t) => ({ ...t, active: false, muted: false })));
       setVbInstalled(installed);
       setSettings(s);
       loaded.current = true;
@@ -225,8 +225,7 @@ export default function App() {
         }),
       );
       const current = tunnelsRef.current.find((t) => t.id === id);
-      if (current?.active)
-        tauriAPI.setTunnelInputGain(id, inputIndex, gain);
+      if (current?.active) tauriAPI.setTunnelInputGain(id, inputIndex, gain);
     },
     [],
   );

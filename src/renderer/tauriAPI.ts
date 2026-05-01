@@ -28,7 +28,8 @@ export const tauriAPI = {
       ducking,
     }),
 
-  destroyTunnel: (id: string): Promise<void> => invoke("destroy_tunnel", { id }),
+  destroyTunnel: (id: string): Promise<void> =>
+    invoke("destroy_tunnel", { id }),
 
   // Mocked for now, or implement in Rust if needed
   checkVBAudioInstalled: (): Promise<boolean> => Promise.resolve(true),
@@ -37,18 +38,19 @@ export const tauriAPI = {
   onVBAudioProgress: (cb: (stage: string, pct?: number) => void) => () => {},
 
   loadTunnels: (): Promise<Tunnel[]> => invoke("load_tunnels"),
-  saveTunnels: (tunnels: Tunnel[]): Promise<void> => invoke("save_tunnels", { tunnels }),
+  saveTunnels: (tunnels: Tunnel[]): Promise<void> =>
+    invoke("save_tunnels", { tunnels }),
 
   exportLayout: async (json: string): Promise<boolean> => {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const { writeTextFile } = await import("@tauri-apps/plugin-fs");
     const path = await save({
-        filters: [{ name: "JSON", extensions: ["json"] }],
-        defaultPath: "layout.json"
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      defaultPath: "layout.json",
     });
     if (path) {
-        await writeTextFile(path, json);
-        return true;
+      await writeTextFile(path, json);
+      return true;
     }
     return false;
   },
@@ -57,22 +59,24 @@ export const tauriAPI = {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { readTextFile } = await import("@tauri-apps/plugin-fs");
     const path = await open({
-        filters: [{ name: "JSON", extensions: ["json"] }],
-        multiple: false
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      multiple: false,
     });
-    if (path && typeof path === 'string') {
-        return await readTextFile(path);
+    if (path && typeof path === "string") {
+      return await readTextFile(path);
     }
     return null;
   },
 
   loadSettings: (): Promise<AppSettings> => invoke("load_settings"),
-  saveSettings: (settings: AppSettings): Promise<void> => invoke("save_settings", { settings }),
+  saveSettings: (settings: AppSettings): Promise<void> =>
+    invoke("save_settings", { settings }),
 
   // Mocked updater for now
   checkForUpdates: (): Promise<void> => Promise.resolve(),
   installUpdate: (): Promise<void> => Promise.resolve(),
-  getUpdateState: (): Promise<UpdateState> => Promise.resolve({ status: "idle" }),
+  getUpdateState: (): Promise<UpdateState> =>
+    Promise.resolve({ status: "idle" }),
   onUpdateStatus: (cb: (state: UpdateState) => void) => () => {},
 
   getTunnelSampleRate: (id: string): Promise<number | null> =>
@@ -108,12 +112,12 @@ export const tauriAPI = {
   onAudioLevel: (
     cb: (tunnelId: string, level: number) => void,
   ): (() => void) => {
-    let unsubPromise = listen("audio-level", (event: any) => {
-        const [tunnelId, level] = event.payload;
-        cb(tunnelId, level);
+    const unsubPromise = listen("audio-level", (event: any) => {
+      const [tunnelId, level] = event.payload;
+      cb(tunnelId, level);
     });
     return () => {
-        unsubPromise.then(unsub => unsub());
+      unsubPromise.then((unsub) => unsub());
     };
   },
 };
