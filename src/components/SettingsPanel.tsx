@@ -70,8 +70,23 @@ export default function SettingsPanel({ open, onClose }: Props) {
     [settings],
   );
 
-  const checkNow = useCallback(() => {
-    tauriAPI.checkForUpdates();
+  const checkNow = useCallback(async () => {
+    setUpdateState({ status: "checking" });
+    try {
+      const result = await tauriAPI.checkForUpdates();
+      setUpdateState(result);
+      
+      // Auto-dismiss "up to date" message after 3 seconds
+      if (result.status === "not-available") {
+        setTimeout(() => setUpdateState({ status: "idle" }), 3000);
+      }
+    } catch (error) {
+      setUpdateState({
+        status: "error",
+        error: error instanceof Error ? error.message : "Check failed",
+      });
+      setTimeout(() => setUpdateState({ status: "idle" }), 3000);
+    }
   }, []);
 
   const installNow = useCallback(() => {

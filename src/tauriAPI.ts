@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { check } from "@tauri-apps/plugin-updater";
 import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "./types";
 
 export const tauriAPI = {
@@ -72,11 +73,43 @@ export const tauriAPI = {
   saveSettings: (settings: AppSettings): Promise<void> =>
     invoke("save_settings", { settings }),
 
-  // Mocked updater for now
-  checkForUpdates: (): Promise<void> => invoke("check_for_updates"),
-  installUpdate: (): Promise<void> => invoke("install_update"),
-  getUpdateState: (): Promise<UpdateState> =>
-    Promise.resolve({ status: "idle" }),
+  // Updater plugin
+  checkForUpdates: async (): Promise<UpdateState> => {
+    try {
+      const update = await check();
+      if (!update) {
+        return { status: "not-available" };
+      }
+      if (update.available) {
+        return { status: "available", version: update.version };
+      }
+      return { status: "not-available" };
+    } catch (error) {
+      return { 
+        status: "error", 
+        error: error instanceof Error ? error.message : "Update check failed" 
+      };
+    }
+  },
+  
+  installUpdate: async (): Promise<void> => {
+    const update = await check();
+    if (update) {
+      await update.downloadAndInstall();
+    }
+  },
+  
+  getUpdateState: async (): Promise<UpdateState> => {
+    const update = await check();
+    if (!update) {
+      return { status: "idle" };
+    }
+    if (update.available) {
+      return { status: "available", version: update.version };
+    }
+    return { status: "not-available" };
+  },
+  
   onUpdateStatus: (_cb: (state: UpdateState) => void) => () => {},
 
   getTunnelSampleRate: (id: string): Promise<number | null> =>
