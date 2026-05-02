@@ -16,4 +16,20 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom")) {
+              return "vendor";
+            }
+            if (id.includes("lucide-react") || id.includes("react-icons")) {
+              return "icons";
+            }
+          }
+        },
+      },
+    },
+  },
 });

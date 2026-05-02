@@ -3,7 +3,7 @@
  *
  * Native C++ audio engine for Virtual Cable.
  * Manages audio tunnels using PortAudio for device I/O and the
- * AppCaptureStream for per-process WASAPI loopback capture.
+ * Rust AppCaptureStream (via C bridge) for per-process WASAPI loopback capture.
  */
 
 #pragma once
@@ -20,7 +20,19 @@
 #include <cstdint>
 
 #include <portaudio.h>
-#include "app_capture.h"
+
+/* ── Rust app capture bridge (extern "C" from Rust) ────────────────────── */
+
+typedef void (*app_capture_callback_fn)(const int16_t* samples, size_t frame_count,
+                                         int channel_count, void* context);
+
+extern "C" {
+    void* app_capture_create(uint32_t pid);
+    void  app_capture_start(void* handle, app_capture_callback_fn cb, void* ctx, int output_channels);
+    void  app_capture_stop(void* handle);
+    void  app_capture_destroy(void* handle);
+    bool  app_capture_is_running(const void* handle);
+}
 
 /* ── Public types used by the Rust FFI layer ───────────────────────────── */
 
@@ -66,8 +78,8 @@ struct InputState {
     /* PortAudio stream for device inputs */
     PaStream*          paStream = nullptr;
 
-    /* App capture stream for process loopback */
-    AppCaptureStream*  captureStream = nullptr;
+    /* Opaque handle to Rust AppCaptureStream (via C bridge) */
+    void*              captureHandle = nullptr;
 
     /* Queue where the input thread pushes data for the mixer to consume */
     AudioQueue         queue;

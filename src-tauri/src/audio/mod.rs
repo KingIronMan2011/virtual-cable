@@ -10,6 +10,8 @@ pub mod metering;
 pub mod device_enum;
 pub mod app_enum;
 pub mod cache;
+pub mod app_capture;
+pub mod app_capture_bridge;
 
 pub use queue::AudioQueue;
 pub use portaudio::AudioDevice as PortAudioDevice;

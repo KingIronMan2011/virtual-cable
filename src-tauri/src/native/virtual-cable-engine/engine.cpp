@@ -182,7 +182,7 @@ static void InputReaderThread(InputState* input, int channels, int sampleRate,
     fprintf(stderr, "[engine] Input reader thread started (device=%d, app=%d)\n",
             input->deviceId, input->appPid);
 
-    if (input->appPid > 0 && input->captureStream) {
+    if (input->appPid > 0 && input->captureHandle) {
         /* App capture — data arrives via callback, just wait for stop */
         while (input->running.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -462,13 +462,15 @@ void Engine::createTunnel(const std::string& tunnelId,
         input->priority.store(inputConfigs[i].priority);
 
         if (isApp(inputConfigs[i])) {
-            /* App capture input */
-            input->captureStream = new AppCaptureStream((uint32_t)inputConfigs[i].appPid);
-            input->captureStream->start(
-                [input, channels](const int16_t* data, size_t frameCount, int ch) {
-                    (void)ch;
-                    input->queue.push(data, frameCount * channels);
+            /* App capture input — use Rust bridge */
+            input->captureHandle = app_capture_create((uint32_t)inputConfigs[i].appPid);
+            app_capture_start(
+                input->captureHandle,
+                [](const int16_t* samples, size_t frameCount, int ch, void* ctx) {
+                    auto* inp = static_cast<InputState*>(ctx);
+                    inp->queue.push(samples, frameCount * ch);
                 },
+                input,
                 channels
             );
         } else {
@@ -533,7 +535,7 @@ void Engine::createTunnel(const std::string& tunnelId,
             /* Cleanup and abort */
             for (auto* inp : tunnel->inputs) {
                 if (inp->paStream) Pa_CloseStream(inp->paStream);
-                if (inp->captureStream) { inp->captureStream->stop(); delete inp->captureStream; }
+                if (inp->captureHandle) { app_capture_stop(inp->captureHandle); app_capture_destroy(inp->captureHandle); }
                 delete inp;
             }
             delete tunnel;
@@ -604,9 +606,9 @@ void Engine::destroyTunnel(const std::string& tunnelId) {
     for (auto* input : tunnel->inputs) {
         input->running.store(false);
         if (input->thread.joinable()) input->thread.join();
-        if (input->captureStream) {
-            input->captureStream->stop();
-            delete input->captureStream;
+        if (input->captureHandle) {
+            app_capture_stop(input->captureHandle);
+            app_capture_destroy(input->captureHandle);
         }
         if (input->paStream) {
             Pa_StopStream(input->paStream);

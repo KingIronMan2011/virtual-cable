@@ -6,8 +6,6 @@ fn main() {
 
     println!("cargo:rerun-if-changed={}", engine_dir.join("engine.cpp").display());
     println!("cargo:rerun-if-changed={}", engine_dir.join("engine.h").display());
-    println!("cargo:rerun-if-changed={}", engine_dir.join("app_capture.cpp").display());
-    println!("cargo:rerun-if-changed={}", engine_dir.join("app_capture.h").display());
     println!("cargo:rerun-if-changed={}", engine_dir.join("engine_c_api.cpp").display());
     println!("cargo:rerun-if-changed={}", engine_dir.join("engine_c_api.h").display());
 
@@ -24,18 +22,13 @@ fn main() {
     build.file(engine_dir.join("engine_c_api.cpp"));
 
     if target_os == "windows" {
-        build.file(engine_dir.join("app_capture.cpp"));
         // Windows specific libraries
         println!("cargo:rustc-link-lib=ole32");
         println!("cargo:rustc-link-lib=oleaut32");
         println!("cargo:rustc-link-lib=uuid");
         println!("cargo:rustc-link-lib=winmm");
         println!("cargo:rustc-link-lib=ksuser");
-        println!("cargo:rustc-link-lib=psapi");
-        println!("cargo:rustc-link-lib=runtimeobject");
         println!("cargo:rustc-link-lib=mmdevapi");
-    } else {
-        build.file(engine_dir.join("app_capture_stub.cpp"));
     }
 
     build.include(engine_dir.join("portaudio/include"));
