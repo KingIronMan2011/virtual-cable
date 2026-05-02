@@ -63,10 +63,10 @@ src-tauri/target/release/bundle/
 
 You'll find:
 
-| File                                      | Description                    |
-| ----------------------------------------- | ------------------------------ |
-| `Virtual Cable_1.X.X_x64-setup.exe`       | NSIS portable installer        |
-| `Virtual Cable_1.X.X_x64-setup.exe.sig`   | Update signature (for updater) |
+| File                                    | Description                    |
+| --------------------------------------- | ------------------------------ |
+| `Virtual Cable_1.X.X_x64-setup.exe`     | NSIS portable installer        |
+| `Virtual Cable_1.X.X_x64-setup.exe.sig` | Update signature (for updater) |
 
 ### Installing
 
@@ -97,15 +97,15 @@ VB-Audio Virtual Cable is free software by VB-Audio Software.
 
 ## Tech stack
 
-| Layer     | Technology                              |
-| --------- | --------------------------------------- |
-| Shell     | Tauri 2.x                               |
-| UI        | React 19 + TypeScript                   |
-| Styling   | Tailwind CSS v4                         |
-| Build     | Vite                                    |
-| Backend   | Rust + C++ (PortAudio + WASAPI)         |
-| Audio     | C++ engine with PortAudio integration   |
-| Installer | Tauri bundler (MSI + NSIS)              |
+| Layer     | Technology                            |
+| --------- | ------------------------------------- |
+| Shell     | Tauri 2.x                             |
+| UI        | React 19 + TypeScript                 |
+| Styling   | Tailwind CSS v4                       |
+| Build     | Vite                                  |
+| Backend   | Rust + C++ (PortAudio + WASAPI)       |
+| Audio     | C++ engine with PortAudio integration |
+| Installer | Tauri bundler (MSI + NSIS)            |
 
 ---
 

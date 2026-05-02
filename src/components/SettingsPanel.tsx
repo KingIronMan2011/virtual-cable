@@ -65,12 +65,12 @@ export default function SettingsPanel({ open, onClose }: Props) {
     async (patch: Partial<typeof settings>) => {
       const next = { ...settings, ...patch };
       setSettings(next);
-      
+
       // Handle Windows startup registry separately
       if ("launchOnStartup" in patch) {
         await tauriAPI.setLaunchOnStartup(patch.launchOnStartup!);
       }
-      
+
       await tauriAPI.saveSettings(next);
     },
     [settings],
@@ -171,7 +171,9 @@ export default function SettingsPanel({ open, onClose }: Props) {
 
             <div className="settings-toggle-row">
               <div className="settings-toggle-text">
-                <span className="settings-toggle-label">Launch on Windows startup</span>
+                <span className="settings-toggle-label">
+                  Launch on Windows startup
+                </span>
                 <span className="settings-toggle-sub">
                   Automatically start the app when your computer boots
                 </span>

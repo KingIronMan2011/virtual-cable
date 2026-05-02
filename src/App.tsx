@@ -73,7 +73,7 @@ export default function App() {
       setTunnels(saved.map((t) => ({ ...t, active: false, muted: false })));
       setVbInstalled(installed);
       setSettings(s);
-      
+
       // Restore window state if it exists
       if (windowState) {
         (async () => {
@@ -86,7 +86,7 @@ export default function App() {
           );
         })();
       }
-      
+
       loaded.current = true;
     });
   }, []);
@@ -129,9 +129,8 @@ export default function App() {
       const unlistenResize = await appWindow.onResized(debouncedSave);
 
       // Save on window close
-      const unlistenCloseRequested = await appWindow.onCloseRequested(
-        saveWindowState,
-      );
+      const unlistenCloseRequested =
+        await appWindow.onCloseRequested(saveWindowState);
 
       return () => {
         unlistenMove();

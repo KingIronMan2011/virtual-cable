@@ -165,6 +165,5 @@ export const tauriAPI = {
   setLaunchOnStartup: (enable: boolean): Promise<void> =>
     invoke("set_launch_on_startup", { enable }),
 
-  getLaunchOnStartup: (): Promise<boolean> =>
-    invoke("get_launch_on_startup"),
+  getLaunchOnStartup: (): Promise<boolean> => invoke("get_launch_on_startup"),
 };
