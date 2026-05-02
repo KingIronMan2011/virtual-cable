@@ -35,6 +35,26 @@ const BUFFER_OPTIONS: { value: BufferSize; label: string; sub: string }[] = [
   { value: 1024, label: "High", sub: "~21 ms" },
 ];
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === "object") {
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
+
 export default function SettingsPanel({ open, onClose }: Props) {
   const [settings, setSettings] = useState<AppSettings>({
     autoUpdate: false,
@@ -91,9 +111,11 @@ export default function SettingsPanel({ open, onClose }: Props) {
       if (result.status === "not-available") {
         setTimeout(() => setUpdateState({ status: "idle" }), 3000);
       }
-    } catch {
+    } catch (error) {
+      console.error("Update check failed:", error);
       setUpdateState({
         status: "error",
+        error: getErrorMessage(error, "Failed to check for updates"),
       });
       setTimeout(() => setUpdateState({ status: "idle" }), 3000);
     }
@@ -104,8 +126,12 @@ export default function SettingsPanel({ open, onClose }: Props) {
       setUpdateState({ status: "checking" }); // Use "checking" to show downloading progress
       try {
         await tauriAPI.installUpdate();
-      } catch {
-        setUpdateState({ status: "error", error: "Failed to download update" });
+      } catch (error) {
+        console.error("Update download/install failed:", error);
+        setUpdateState({
+          status: "error",
+          error: getErrorMessage(error, "Failed to download update"),
+        });
         setTimeout(() => setUpdateState({ status: "idle" }), 3000);
       }
     }
