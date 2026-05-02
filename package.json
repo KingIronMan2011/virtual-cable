@@ -8,7 +8,6 @@
     "dev": "tauri dev",
     "build": "dotenv -- tauri build --ci",
     "postbuild": "shx cp src-tauri/target/release/bundle/nsis/* website/public/releases/",
-    "icons:build": "ts-node scripts/build-icons.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src",
