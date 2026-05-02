@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_void};
 use tauri::{AppHandle, Manager, Emitter};
 use std::sync::OnceLock;
 
@@ -9,43 +7,6 @@ pub mod audio;
 pub mod storage;
 pub mod system;
 pub mod ui;
-
-// --- FFI Imports ---
-
-extern "C" {
-    fn engine_initialize();
-    fn engine_terminate();
-
-    fn engine_create_tunnel(
-        tunnel_id: *const c_char,
-        num_inputs: c_int,
-        input_device_ids: *const c_int,
-        input_app_pids: *const u32,
-        input_gains: *const f32,
-        input_priorities: *const bool,
-        output_device_id: c_int,
-        frames_per_buffer: c_int,
-        requested_channels: c_int,
-        duck_enabled: bool,
-        duck_amount: f32,
-        duck_release: f32,
-    );
-
-    fn engine_destroy_tunnel(tunnel_id: *const c_char);
-    fn engine_destroy_all_tunnels();
-    // fn engine_reload_all_tunnels(frames_per_buffer: c_int);
-
-    fn engine_set_tunnel_muted(tunnel_id: *const c_char, muted: bool);
-    fn engine_set_tunnel_gain(tunnel_id: *const c_char, gain: f32);
-    fn engine_set_tunnel_input_gain(tunnel_id: *const c_char, input_index: c_int, gain: f32);
-    fn engine_set_tunnel_input_priority(tunnel_id: *const c_char, input_index: c_int, priority: bool);
-    fn engine_set_tunnel_ducking(tunnel_id: *const c_char, enabled: bool, amount: f32, release: f32);
-
-    fn engine_get_tunnel_sample_rate(tunnel_id: *const c_char) -> c_int;
-    fn engine_get_tunnel_channel_count(tunnel_id: *const c_char) -> c_int;
-
-    fn engine_set_level_callback(cb: extern "C" fn(*const c_char, f32, *mut c_void), user_data: *mut c_void);
-}
 
 // --- Data Models ---
 
@@ -89,8 +50,7 @@ struct DuckingConfig {
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
-extern "C" fn on_audio_level(tunnel_id: *const c_char, level: f32, _user_data: *mut c_void) {
-    let tunnel_id = unsafe { CStr::from_ptr(tunnel_id).to_string_lossy().into_owned() };
+fn on_audio_level(tunnel_id: String, level: f32) {
     if let Some(handle) = APP_HANDLE.get() {
         let _ = handle.emit("audio-level", (tunnel_id, level));
     }
@@ -133,89 +93,71 @@ fn create_tunnel(
     channel_count: Option<i32>,
     ducking: DuckingConfig,
 ) {
-    let c_id = CString::new(id).unwrap();
-    let num_inputs = inputs.len() as c_int;
-    let device_ids: Vec<c_int> = inputs.iter().map(|i| i.deviceId).collect();
-    let app_pids: Vec<u32> = inputs.iter().map(|i| i.appPid.unwrap_or(0)).collect();
-    let gains: Vec<f32> = inputs.iter().map(|i| i.gain).collect();
-    let priorities: Vec<bool> = inputs.iter().map(|i| i.priority).collect();
+    let inputs = inputs.into_iter().map(|i| audio::tunnel::TunnelInputConfig {
+        device_id: i.deviceId,
+        app_pid: i.appPid.unwrap_or(0),
+        gain: i.gain,
+        priority: i.priority,
+    }).collect();
 
-    unsafe {
-        engine_create_tunnel(
-            c_id.as_ptr(),
-            num_inputs,
-            device_ids.as_ptr(),
-            app_pids.as_ptr(),
-            gains.as_ptr(),
-            priorities.as_ptr(),
-            output_id,
-            0,
-            channel_count.unwrap_or(0),
-            ducking.enabled,
-            ducking.amount,
-            ducking.release,
-        );
-    }
+    let ducking_cfg = audio::tunnel::DuckingConfig {
+        enabled: ducking.enabled,
+        amount: ducking.amount,
+        release: ducking.release,
+    };
+
+    audio::engine::create_tunnel(
+        id,
+        inputs,
+        output_id,
+        256,
+        channel_count.unwrap_or(2) as u32,
+        ducking_cfg,
+    );
 }
 
 #[tauri::command]
 fn destroy_tunnel(id: String) {
-    let c_id = CString::new(id).unwrap();
-    unsafe {
-        engine_destroy_tunnel(c_id.as_ptr());
-    }
+    audio::engine::destroy_tunnel(&id);
 }
 
 #[tauri::command]
 fn set_tunnel_muted(id: String, muted: bool) {
-    let c_id = CString::new(id).unwrap();
-    unsafe {
-        engine_set_tunnel_muted(c_id.as_ptr(), muted);
-    }
+    audio::engine::set_tunnel_muted(&id, muted);
 }
 
 #[tauri::command]
 fn set_tunnel_gain(id: String, gain: f32) {
-    let c_id = CString::new(id).unwrap();
-    unsafe {
-        engine_set_tunnel_gain(c_id.as_ptr(), gain);
-    }
+    audio::engine::set_tunnel_gain(&id, gain);
 }
 
 #[tauri::command]
 fn set_tunnel_input_gain(id: String, input_index: i32, gain: f32) {
-    let c_id = CString::new(id).unwrap();
-    unsafe {
-        engine_set_tunnel_input_gain(c_id.as_ptr(), input_index, gain);
-    }
+    audio::engine::set_tunnel_input_gain(&id, input_index, gain);
 }
 
 #[tauri::command]
 fn set_tunnel_input_priority(id: String, input_index: i32, priority: bool) {
-    let c_id = CString::new(id).unwrap();
-    unsafe {
-        engine_set_tunnel_input_priority(c_id.as_ptr(), input_index, priority);
-    }
+    audio::engine::set_tunnel_input_priority(&id, input_index, priority);
 }
 
 #[tauri::command]
 fn set_tunnel_ducking(id: String, enabled: bool, amount: f32, release: f32) {
-    let c_id = CString::new(id).unwrap();
-    unsafe {
-        engine_set_tunnel_ducking(c_id.as_ptr(), enabled, amount, release);
-    }
+    audio::engine::set_tunnel_ducking(&id, audio::tunnel::DuckingConfig {
+        enabled,
+        amount,
+        release,
+    });
 }
 
 #[tauri::command]
 fn get_tunnel_sample_rate(id: String) -> i32 {
-    let c_id = CString::new(id).unwrap();
-    unsafe { engine_get_tunnel_sample_rate(c_id.as_ptr()) }
+    audio::engine::get_tunnel_sample_rate(&id)
 }
 
 #[tauri::command]
 fn get_tunnel_channel_count(id: String) -> i32 {
-    let c_id = CString::new(id).unwrap();
-    unsafe { engine_get_tunnel_channel_count(c_id.as_ptr()) }
+    audio::engine::get_tunnel_channel_count(&id)
 }
 
 // --- Storage ---
@@ -325,9 +267,7 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api: _api, .. } = event {
                 // If minimizeToTray is enabled, we hide the window instead of closing it
                 // We'll check the setting here. For now, let's just always stop tunnels.
-                unsafe {
-                    engine_destroy_all_tunnels();
-                }
+                audio::engine::destroy_all_tunnels();
             }
         })
         .setup(|app| {
@@ -345,7 +285,7 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
                         "quit" => {
-                            unsafe { engine_terminate(); }
+                            audio::engine::terminate();
                             app.exit(0);
                         }
                         "show" => {
@@ -372,64 +312,8 @@ pub fn run() {
                 .build(app)?;
 
             let _ = APP_HANDLE.set(app.handle().clone());
-            
-            // On Windows, ensure portaudio_x64.dll exists
-            #[cfg(target_os = "windows")]
-            {
-                use std::io::Write;
-                use std::os::windows::ffi::OsStrExt;
-                
-                extern "system" {
-                    fn SetDllDirectoryW(lpPathName: *const u16) -> i32;
-                }
-
-                let dll_bytes = include_bytes!("./native/virtual-cable-engine/portaudio/bin/portaudio_x64.dll");
-                let dll_name = "portaudio_x64.dll";
-                
-                // Try several locations to unpack the DLL
-                let mut success = false;
-                let mut search_paths = Vec::new();
-
-                // 1. Next to the EXE (best for portable)
-                if let Ok(exe_path) = std::env::current_exe() {
-                    if let Some(parent) = exe_path.parent() {
-                        let target = parent.join(dll_name);
-                        search_paths.push(parent.to_path_buf());
-                        if !target.exists() {
-                            if let Ok(mut f) = std::fs::File::create(&target) {
-                                let _ = f.write_all(dll_bytes);
-                            }
-                        }
-                        if target.exists() { success = true; }
-                    }
-                }
-
-                // 2. App Data (fallback for installed version)
-                if !success {
-                    if let Ok(data_dir) = app.path().app_data_dir() {
-                        let _ = std::fs::create_dir_all(&data_dir);
-                        let target = data_dir.join(dll_name);
-                        search_paths.push(data_dir.clone());
-                        if !target.exists() {
-                            if let Ok(mut f) = std::fs::File::create(&target) {
-                                let _ = f.write_all(dll_bytes);
-                            }
-                        }
-                    }
-                }
-
-                // Add all potential paths to the search path
-                for path in search_paths {
-                    let mut path_wide: Vec<u16> = path.as_os_str().encode_wide().collect();
-                    path_wide.push(0);
-                    unsafe { SetDllDirectoryW(path_wide.as_ptr()); }
-                }
-            }
-
-            unsafe {
-                engine_initialize();
-                engine_set_level_callback(on_audio_level, std::ptr::null_mut());
-            }
+            audio::engine::initialize();
+            audio::engine::set_level_callback(on_audio_level);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -457,9 +341,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                unsafe {
-                    engine_terminate();
-                }
+                audio::engine::terminate();
             }
         });
 }

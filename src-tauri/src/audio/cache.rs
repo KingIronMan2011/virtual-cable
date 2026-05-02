@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
-use crate::audio::portaudio::AudioDevice;
+use crate::audio::device_enum::AudioDevice;
 use crate::audio::app_enum::AudioApp;
 use crate::audio::{device_enum, app_enum};
 

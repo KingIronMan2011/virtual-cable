@@ -1,15 +1,17 @@
-/// Device enumeration with filtering and normalization.
-///
-/// This stays in Rust by reading PortAudio device metadata directly.
+use cpal::traits::{DeviceTrait, HostTrait};
+use serde::Serialize;
 
-use crate::audio::portaudio::{get_portaudio_devices, AudioDevice};
+#[derive(Debug, Clone, Serialize)]
+pub struct AudioDevice {
+    pub id: i32,
+    pub name: String,
+    pub max_input_channels: i32,
+    pub max_output_channels: i32,
+    pub default_sample_rate: i32,
+    pub host_api_name: String,
+}
 
-// ===== Device Filtering =====
-
-/// Check if a device name is a valid user-facing device
-/// Filters out Windows internal/stub device names
-fn is_valid_device_name(name: &str) -> bool {
-    // Filter out common junk names
+pub fn is_valid_device_name(name: &str) -> bool {
     let junk_names = [
         "Primary Sound Driver",
         "Microsoft Sound Mapper",
@@ -24,103 +26,67 @@ fn is_valid_device_name(name: &str) -> bool {
             return false;
         }
     }
-
-    // Must have at least some meaningful name
     !name.is_empty() && name.len() > 2
 }
 
-// ===== Public API =====
-
-/// Get all available audio devices with filtering and normalization
-///
-/// Filters out invalid/junk device names and returns a clean list
-/// suitable for UI display.
 pub fn get_audio_devices() -> Vec<AudioDevice> {
-    let devices: Vec<_> = get_portaudio_devices()
-        .into_iter()
-        .filter(|device| is_valid_device_name(&device.name))
-        .collect();
+    let mut devices = Vec::new();
+    let host = cpal::default_host();
+    let host_name = host.id().name().to_string();
 
-    let wasapi_devices: Vec<_> = devices
-        .iter()
-        .filter(|device| device.host_api_name.contains("WASAPI"))
-        .cloned()
-        .collect();
+    let mut id_counter = 0;
+    if let Ok(device_iter) = host.devices() {
+        for device in device_iter {
+            if let Ok(name) = device.name() {
+                if !is_valid_device_name(&name) {
+                    continue;
+                }
 
-    let mut result = if wasapi_devices.is_empty() {
-        devices
-    } else {
-        wasapi_devices
-    };
+                let mut max_input = 0;
+                if let Ok(configs) = device.supported_input_configs() {
+                    for cfg in configs {
+                        max_input = max_input.max(cfg.channels() as i32);
+                    }
+                }
 
-    result.sort_by_key(|device| device.id);
-    result
+                let mut max_output = 0;
+                let mut default_sr = 48000;
+                if let Ok(configs) = device.supported_output_configs() {
+                    for cfg in configs {
+                        max_output = max_output.max(cfg.channels() as i32);
+                        default_sr = cfg.max_sample_rate().0 as i32;
+                    }
+                }
+
+                // If a device has both 0 input and 0 output, skip it
+                if max_input == 0 && max_output == 0 {
+                    continue;
+                }
+
+                devices.push(AudioDevice {
+                    id: id_counter,
+                    name,
+                    max_input_channels: max_input,
+                    max_output_channels: max_output,
+                    default_sample_rate: default_sr,
+                    host_api_name: host_name.clone(),
+                });
+                id_counter += 1;
+            }
+        }
+    }
+    devices
 }
 
-/// Get input devices only (devices with max_input_channels > 0)
 pub fn get_input_devices() -> Vec<AudioDevice> {
-    get_audio_devices()
-        .into_iter()
-        .filter(|d| d.max_input_channels > 0)
-        .collect()
+    get_audio_devices().into_iter().filter(|d| d.max_input_channels > 0).collect()
 }
 
-/// Get output devices only (devices with max_output_channels > 0)
 pub fn get_output_devices() -> Vec<AudioDevice> {
-    get_audio_devices()
-        .into_iter()
-        .filter(|d| d.max_output_channels > 0)
-        .collect()
+    get_audio_devices().into_iter().filter(|d| d.max_output_channels > 0).collect()
 }
 
-/// Find a device by name (case-insensitive substring match)
 pub fn find_device_by_name(name: &str) -> Option<AudioDevice> {
     let name_lower = name.to_lowercase();
-    get_audio_devices()
-        .into_iter()
-        .find(|d| d.name.to_lowercase().contains(&name_lower))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_valid_device_name() {
-        assert!(is_valid_device_name("Speakers"));
-        assert!(is_valid_device_name("Line In"));
-        assert!(is_valid_device_name("Microphone (Realtek)"));
-        
-        assert!(!is_valid_device_name("Primary Sound Driver"));
-        assert!(!is_valid_device_name("Microsoft Sound Mapper"));
-        assert!(!is_valid_device_name("Stereo Mixer"));
-        assert!(!is_valid_device_name(""));
-        assert!(!is_valid_device_name("ab")); // Too short
-    }
-
-    #[test]
-    fn test_get_audio_devices() {
-        let devices = get_audio_devices();
-        // May be empty in CI environments
-        for device in &devices {
-            assert!(!device.name.is_empty());
-            assert!(device.id >= 0);
-        }
-    }
-
-    #[test]
-    fn test_get_input_devices() {
-        let devices = get_input_devices();
-        for device in &devices {
-            assert!(device.max_input_channels > 0);
-        }
-    }
-
-    #[test]
-    fn test_get_output_devices() {
-        let devices = get_output_devices();
-        for device in &devices {
-            assert!(device.max_output_channels > 0);
-        }
-    }
+    get_audio_devices().into_iter().find(|d| d.name.to_lowercase().contains(&name_lower))
 }

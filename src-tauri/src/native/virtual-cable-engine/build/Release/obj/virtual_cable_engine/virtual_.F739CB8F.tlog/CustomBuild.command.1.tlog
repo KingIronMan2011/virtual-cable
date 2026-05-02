@@ -1,3 +1,0 @@
-^C:\USERS\JULIA\DOWNLOADS\VIRTUAL-CABLE\SRC\NATIVE\VIRTUAL-CABLE-ENGINE\PORTAUDIO\BIN\PORTAUDIO_X64.DLL
-call mkdir "..\build\Release" 2>nul & set ERRORLEVEL=0 & copy /Y "..\portaudio\bin\portaudio_x64.dll" "..\build\Release\portaudio_x64.dll"
-if %errorlevel% neq 0 exit /b %errorlevel%

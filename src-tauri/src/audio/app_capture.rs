@@ -60,19 +60,14 @@ mod platform {
 
     // ===== Sample Conversion =====
 
-    /// Convert a float sample to 16-bit signed integer with clamping
-    #[inline]
-    fn f32_to_i16(f: f32) -> i16 {
-        let v = (f * 32767.0) as i32;
-        v.clamp(-32768, 32767) as i16
-    }
+
 
     // ===== Callback Type =====
 
     /// Callback signature for audio data delivery.
     /// Called from the capture thread — must be thread-safe.
     /// Parameters: (samples, frame_count, channel_count)
-    pub type DataCallback = Box<dyn Fn(&[i16], usize, i32) + Send + 'static>;
+    pub type DataCallback = Box<dyn FnMut(&[f32], usize, i32) + Send + 'static>;
 
     // ===== Completion Handler =====
 
@@ -81,6 +76,7 @@ mod platform {
     #[implement(IActivateAudioInterfaceCompletionHandler)]
     struct CompletionHandler {
         event: HANDLE,
+        target_sample_rate: u32,
         result: std::sync::Mutex<ActivationResult>,
     }
 
@@ -103,9 +99,10 @@ mod platform {
     }
 
     impl CompletionHandler {
-        fn new(event: HANDLE) -> Self {
+        fn new(event: HANDLE, target_sample_rate: u32) -> Self {
             Self {
                 event,
+                target_sample_rate,
                 result: std::sync::Mutex::new(ActivationResult {
                     client: None,
                     capture: None,
@@ -179,6 +176,7 @@ mod platform {
             &self,
             client: &IAudioClient,
         ) -> Option<WaveFormat> {
+            let target = self.target_sample_rate;
             struct FmtCandidate {
                 rate: u32,
                 channels: u16,
@@ -187,6 +185,7 @@ mod platform {
             }
 
             let candidates = [
+                FmtCandidate { rate: target, channels: 2, bits: 32, is_float: true },
                 FmtCandidate { rate: 48000, channels: 2, bits: 32, is_float: true },
                 FmtCandidate { rate: 44100, channels: 2, bits: 32, is_float: true },
                 FmtCandidate { rate: 48000, channels: 2, bits: 16, is_float: false },
@@ -275,7 +274,7 @@ mod platform {
         ///
         /// Activation (COM setup) happens on the calling thread.
         /// The capture polling loop runs on a dedicated background thread.
-        pub fn start(&mut self, callback: DataCallback, output_channels: i32) {
+        pub fn start(&mut self, callback: DataCallback, output_channels: i32, target_sample_rate: u32) {
             if self.running.load(Ordering::SeqCst) {
                 return;
             }
@@ -283,7 +282,7 @@ mod platform {
             let output_channels = output_channels.clamp(1, 2);
 
             // Activate the process loopback audio client on the calling thread
-            let activation = match Self::activate(self.pid) {
+            let activation = match Self::activate(self.pid, target_sample_rate) {
                 Ok(a) => a,
                 Err(e) => {
                     eprintln!("[app-capture] Activation failed for pid {}: {}", self.pid, e);
@@ -317,7 +316,7 @@ mod platform {
 
         /// Activate the process loopback audio client.
         /// This sets up the WASAPI process loopback via ActivateAudioInterfaceAsync.
-        fn activate(pid: u32) -> Result<ActivatedCapture, String> {
+        fn activate(pid: u32, target_sample_rate: u32) -> Result<ActivatedCapture, String> {
             unsafe {
                 // Build activation params
                 let loopback_params = AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS {
@@ -351,7 +350,7 @@ mod platform {
                     .map_err(|e| format!("CreateEvent failed: {}", e))?;
 
                 // Create handler
-                let handler_impl = CompletionHandler::new(event);
+                let handler_impl = CompletionHandler::new(event, target_sample_rate);
                 let handler: IActivateAudioInterfaceCompletionHandler = handler_impl.into();
 
                 // Call ActivateAudioInterfaceAsync
@@ -416,7 +415,7 @@ mod platform {
     /// The capture loop that runs on a dedicated background thread
     fn capture_loop(
         activated: ActivatedCapture,
-        callback: DataCallback,
+        mut callback: DataCallback,
         out_ch: i32,
         running: Arc<AtomicBool>,
     ) {
@@ -444,7 +443,7 @@ mod platform {
             fmt.format_tag, sys_ch, fmt.sample_rate, sys_bits
         );
 
-        let mut chunk_buf: Vec<i16> = Vec::new();
+        let mut chunk_buf: Vec<f32> = Vec::new();
 
         while running.load(Ordering::SeqCst) {
             let packet_frames = match unsafe { capture.GetNextPacketSize() } {
@@ -484,13 +483,13 @@ mod platform {
                 }
 
                 let out_samples = num_frames as usize * out_ch as usize;
-                chunk_buf.resize(out_samples, 0i16);
+                chunk_buf.resize(out_samples, 0.0);
 
                 if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
                     // Silent buffer — fill with zeros
-                    chunk_buf.fill(0);
+                    chunk_buf.fill(0.0);
                 } else if is_float {
-                    // Float → i16 conversion with channel mapping
+                    // Float passthrough with channel mapping
                     let src = unsafe {
                         std::slice::from_raw_parts(
                             data_ptr as *const f32,
@@ -500,17 +499,16 @@ mod platform {
                     for f in 0..num_frames as usize {
                         if out_ch == 1 && sys_ch >= 2 {
                             let mixed = (src[f * sys_ch as usize] + src[f * sys_ch as usize + 1]) * 0.5;
-                            chunk_buf[f] = f32_to_i16(mixed);
+                            chunk_buf[f] = mixed;
                         } else {
                             for c in 0..out_ch as usize {
                                 let src_ch = if (c as i32) < sys_ch { c } else { (sys_ch - 1) as usize };
-                                chunk_buf[f * out_ch as usize + c] =
-                                    f32_to_i16(src[f * sys_ch as usize + src_ch]);
+                                chunk_buf[f * out_ch as usize + c] = src[f * sys_ch as usize + src_ch];
                             }
                         }
                     }
                 } else if is_pcm && sys_bits == 16 {
-                    // 16-bit PCM passthrough with channel mapping
+                    // 16-bit PCM → f32 conversion with channel mapping
                     let src = unsafe {
                         std::slice::from_raw_parts(
                             data_ptr as *const i16,
@@ -522,18 +520,18 @@ mod platform {
                             let mixed = ((src[f * sys_ch as usize] as i32)
                                 + (src[f * sys_ch as usize + 1] as i32))
                                 >> 1;
-                            chunk_buf[f] = mixed as i16;
+                            chunk_buf[f] = mixed as f32 / 32768.0;
                         } else {
                             for c in 0..out_ch as usize {
                                 let src_ch = if (c as i32) < sys_ch { c } else { (sys_ch - 1) as usize };
                                 chunk_buf[f * out_ch as usize + c] =
-                                    src[f * sys_ch as usize + src_ch];
+                                    src[f * sys_ch as usize + src_ch] as f32 / 32768.0;
                             }
                         }
                     }
                 } else {
                     // Unsupported format — output silence
-                    chunk_buf.fill(0);
+                    chunk_buf.fill(0.0);
                 }
 
                 let _ = unsafe { capture.ReleaseBuffer(num_frames) };
@@ -565,13 +563,13 @@ pub use platform::{AppCaptureStream, DataCallback};
 // Stub for non-Windows platforms
 #[cfg(not(target_os = "windows"))]
 pub mod platform {
-    pub type DataCallback = Box<dyn Fn(&[i16], usize, i32) + Send + 'static>;
+    pub type DataCallback = Box<dyn FnMut(&[i16], usize, i32) + Send + 'static>;
 
     pub struct AppCaptureStream;
 
     impl AppCaptureStream {
         pub fn new(_pid: u32) -> Self { Self }
-        pub fn start(&mut self, _callback: DataCallback, _output_channels: i32) {}
+        pub fn start(&mut self, _callback: DataCallback, _output_channels: i32, _target_sample_rate: u32) {}
         pub fn stop(&mut self) {}
         pub fn is_running(&self) -> bool { false }
     }
