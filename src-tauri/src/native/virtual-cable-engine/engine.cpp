@@ -2,12 +2,6 @@
  * engine.cpp
  *
  * Native C++ audio engine for Virtual Cable.
- *
- * This file contains:
- *   1. AudioQueue implementation (thread-safe FIFO)
- *   2. TunnelEngine implementation (PortAudio streams, mixing, metering)
- *   3. Device enumeration with WASAPI/MME filtering
- *   4. N-API bindings exposing everything to Node.js
  */
 
 #include "engine.h"
@@ -83,6 +77,15 @@ static LevelCallback                                  g_levelCallback;
 
 /* ── Device helpers ────────────────────────────────────────────────────── */
 
+struct AudioDeviceInfo {
+    int         id;
+    std::string name;
+    int         maxInputChannels;
+    int         maxOutputChannels;
+    std::string hostAPIName;
+    double      defaultSampleRate;
+};
+
 static std::string PaHostApiName(int deviceIndex) {
     const PaDeviceInfo* info = Pa_GetDeviceInfo(deviceIndex);
     if (!info) return "";
@@ -106,22 +109,6 @@ static std::vector<AudioDeviceInfo> GetAllDevices() {
         result.push_back(d);
     }
     return result;
-}
-
-/* Names that PortAudio/MME exposes as generic placeholders */
-static const char* JUNK_NAMES[] = {
-    "primary sound driver",
-    "primary sound capture driver",
-    "microsoft sound mapper",
-};
-
-static bool IsJunk(const std::string& name) {
-    std::string lower = name;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    for (const auto* j : JUNK_NAMES) {
-        if (lower.find(j) != std::string::npos) return true;
-    }
-    return false;
 }
 
 /**
@@ -387,35 +374,6 @@ void Engine::terminate() {
     }
 }
 
-std::vector<AudioDeviceInfo> Engine::getAudioDevices() {
-    if (!g_paInitialized) initialize();
-
-    auto all = GetAllDevices();
-
-    /* Filter: remove junk names, prefer WASAPI for enumeration */
-    std::vector<AudioDeviceInfo> filtered;
-    for (const auto& d : all) {
-        if (d.id < 0 || IsJunk(d.name)) continue;
-        filtered.push_back(d);
-    }
-
-    std::vector<AudioDeviceInfo> wasapi;
-    for (const auto& d : filtered) {
-        if (d.hostAPIName == "Windows WASAPI") wasapi.push_back(d);
-    }
-
-    auto& pool = wasapi.empty() ? filtered : wasapi;
-
-    /* Return only the fields the UI needs */
-    std::vector<AudioDeviceInfo> result;
-    for (const auto& d : pool) {
-        result.push_back({d.id, d.name, d.maxInputChannels,
-                          d.maxOutputChannels, d.hostAPIName,
-                          d.defaultSampleRate});
-    }
-    return result;
-}
-
 void Engine::createTunnel(const std::string& tunnelId,
                            const std::vector<InputConfig>& inputConfigs,
                            int outputDeviceId,
@@ -674,44 +632,6 @@ void Engine::destroyAllTunnels() {
         for (const auto& [id, _] : g_tunnels) ids.push_back(id);
     }
     for (const auto& id : ids) destroyTunnel(id);
-}
-
-void Engine::reloadAllTunnels(int framesPerBuffer) {
-    struct Snapshot {
-        std::string id;
-        std::vector<InputConfig> inputs;
-        int outputDeviceId;
-        int channelCount;
-        DuckingConfig ducking;
-    };
-
-    std::vector<Snapshot> snapshots;
-    {
-        std::lock_guard<std::mutex> lk(g_tunnelMtx);
-        for (const auto& [id, tunnel] : g_tunnels) {
-            Snapshot s;
-            s.id = id;
-            s.outputDeviceId = tunnel->outputDeviceId;
-            s.channelCount = tunnel->channelCount;
-            s.ducking = {
-                tunnel->duckEnabled.load(),
-                tunnel->duckAmount.load(),
-                tunnel->duckRelease.load()
-            };
-            for (auto* inp : tunnel->inputs) {
-                s.inputs.push_back({
-                    inp->deviceId, inp->appPid,
-                    inp->gain.load(), inp->priority.load()
-                });
-            }
-            snapshots.push_back(std::move(s));
-        }
-    }
-
-    for (const auto& s : snapshots) {
-        createTunnel(s.id, s.inputs, s.outputDeviceId,
-                     framesPerBuffer, s.channelCount, s.ducking);
-    }
 }
 
 void Engine::setTunnelMuted(const std::string& tunnelId, bool muted) {

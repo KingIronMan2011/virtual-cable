@@ -3,23 +3,18 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use tauri::{AppHandle, Manager, Emitter};
 use std::sync::OnceLock;
-use winreg::RegKey;
+
+// --- Modules ---
+pub mod audio;
+pub mod storage;
+pub mod system;
+pub mod ui;
 
 // --- FFI Imports ---
 
 extern "C" {
     fn engine_initialize();
     fn engine_terminate();
-
-    fn engine_get_audio_devices(
-        cb: extern "C" fn(c_int, *const c_char, c_int, c_int, *const c_char, c_int, *mut c_void),
-        user_data: *mut c_void,
-    );
-
-    fn engine_get_audio_apps(
-        cb: extern "C" fn(u32, *const c_char, *const c_char, *mut c_void),
-        user_data: *mut c_void,
-    );
 
     fn engine_create_tunnel(
         tunnel_id: *const c_char,
@@ -54,9 +49,10 @@ extern "C" {
 
 // --- Data Models ---
 
+/// Serializable audio device for UI (camelCase fields for JSON compatibility)
 #[derive(Serialize)]
 #[allow(non_snake_case)]
-struct AudioDevice {
+struct AudioDeviceDTO {
     id: i32,
     name: String,
     maxInputChannels: i32,
@@ -65,8 +61,9 @@ struct AudioDevice {
     defaultSampleRate: i32,
 }
 
+/// Serializable audio app for UI
 #[derive(Serialize)]
-struct AudioApp {
+struct AudioAppDTO {
     pid: u32,
     name: String,
     exe: String,
@@ -102,52 +99,30 @@ extern "C" fn on_audio_level(tunnel_id: *const c_char, level: f32, _user_data: *
 // --- Commands ---
 
 #[tauri::command]
-fn get_devices() -> Vec<AudioDevice> {
-    let mut devices = Vec::new();
-
-    extern "C" fn device_cb(
-        id: c_int,
-        name: *const c_char,
-        max_input: c_int,
-        max_output: c_int,
-        host_api: *const c_char,
-        default_sr: c_int,
-        user_data: *mut c_void,
-    ) {
-        let devices = unsafe { &mut *(user_data as *mut Vec<AudioDevice>) };
-        let name = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
-        let host_api = unsafe { CStr::from_ptr(host_api).to_string_lossy().into_owned() };
-        devices.push(AudioDevice {
-            id,
-            name,
-            maxInputChannels: max_input,
-            maxOutputChannels: max_output,
-            hostAPIName: host_api,
-            defaultSampleRate: default_sr,
-        });
-    }
-
-    unsafe {
-        engine_get_audio_devices(device_cb, &mut devices as *mut _ as *mut c_void);
-    }
-    devices
+fn get_devices() -> Vec<AudioDeviceDTO> {
+    audio::get_audio_devices()
+        .into_iter()
+        .map(|d| AudioDeviceDTO {
+            id: d.id,
+            name: d.name,
+            maxInputChannels: d.max_input_channels,
+            maxOutputChannels: d.max_output_channels,
+            hostAPIName: d.host_api_name,
+            defaultSampleRate: d.default_sample_rate,
+        })
+        .collect()
 }
 
 #[tauri::command]
-fn get_audio_apps() -> Vec<AudioApp> {
-    let mut apps = Vec::new();
-
-    extern "C" fn app_cb(pid: u32, name: *const c_char, exe: *const c_char, user_data: *mut c_void) {
-        let apps = unsafe { &mut *(user_data as *mut Vec<AudioApp>) };
-        let name = unsafe { CStr::from_ptr(name).to_string_lossy().into_owned() };
-        let exe = unsafe { CStr::from_ptr(exe).to_string_lossy().into_owned() };
-        apps.push(AudioApp { pid, name, exe });
-    }
-
-    unsafe {
-        engine_get_audio_apps(app_cb, &mut apps as *mut _ as *mut c_void);
-    }
-    apps
+fn get_audio_apps() -> Vec<AudioAppDTO> {
+    audio::get_audio_apps()
+        .into_iter()
+        .map(|a| AudioAppDTO {
+            pid: a.pid,
+            name: a.name,
+            exe: a.exe,
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -328,49 +303,16 @@ fn save_window_state(app: AppHandle, state: WindowState) {
     }
 }
 
-// --- Windows Startup ---
+// --- Windows Startup (now using system module) ---
 
 #[tauri::command]
 fn set_launch_on_startup(_app: AppHandle, enable: bool) -> Result<(), String> {
-    let hkcu = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
-    let run_key = hkcu
-        .open_subkey_with_flags(
-            "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-            winreg::enums::KEY_WRITE,
-        )
-        .map_err(|e| format!("Failed to open Run registry key: {}", e))?;
-
-    if enable {
-        // Get the app executable path
-        let exe_path = std::env::current_exe()
-            .map_err(|e| format!("Failed to get executable path: {}", e))?
-            .to_string_lossy()
-            .to_string();
-        
-        run_key
-            .set_value("VirtualCable", &exe_path)
-            .map_err(|e| format!("Failed to set registry value: {}", e))?
-    } else {
-        // Remove from startup
-        let _ = run_key.delete_value("VirtualCable");
-    }
-
-    Ok(())
+    system::set_launch_on_startup(enable)
 }
 
 #[tauri::command]
 fn get_launch_on_startup() -> Result<bool, String> {
-    let hkcu = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
-    match hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run") {
-        Ok(run_key) => {
-            // Try to get the value; if it doesn't exist, get_value will return Err
-            match run_key.get_value::<String, &str>("VirtualCable") {
-                Ok(_) => Ok(true),
-                Err(_) => Ok(false), // Value not found
-            }
-        }
-        Err(_) => Ok(false), // Key doesn't exist, so not in startup
-    }
+    system::is_launch_on_startup()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

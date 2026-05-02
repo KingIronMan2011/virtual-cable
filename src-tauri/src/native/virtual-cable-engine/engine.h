@@ -22,16 +22,7 @@
 #include <portaudio.h>
 #include "app_capture.h"
 
-/* ── Public types (mirroring the TypeScript interfaces) ────────────────── */
-
-struct AudioDeviceInfo {
-    int         id;
-    std::string name;
-    int         maxInputChannels;
-    int         maxOutputChannels;
-    std::string hostAPIName;
-    double      defaultSampleRate;
-};
+/* ── Public types used by the Rust FFI layer ───────────────────────────── */
 
 struct InputConfig {
     int  deviceId;      /* PortAudio device ID, or -1 if using app capture */
@@ -68,7 +59,7 @@ struct InputState {
     int  deviceId;
     int  appPid;
 
-    /* Live-adjustable parameters (read from mixer thread, written from JS thread) */
+    /* Live-adjustable parameters (read from mixer thread, written from Rust) */
     std::atomic<float> gain{1.0f};
     std::atomic<bool>  priority{false};
 
@@ -131,9 +122,6 @@ namespace Engine {
     void initialize();
     void terminate();
 
-    /* Device enumeration — returns WASAPI-preferred, junk-filtered list */
-    std::vector<AudioDeviceInfo> getAudioDevices();
-
     /* Tunnel lifecycle */
     void createTunnel(const std::string& tunnelId,
                       const std::vector<InputConfig>& inputs,
@@ -143,7 +131,6 @@ namespace Engine {
                       const DuckingConfig& ducking);
     void destroyTunnel(const std::string& tunnelId);
     void destroyAllTunnels();
-    void reloadAllTunnels(int framesPerBuffer);
 
     /* Live parameter updates */
     void setTunnelMuted(const std::string& tunnelId, bool muted);

@@ -1,34 +1,16 @@
 /**
  * app_capture.h
  *
- * Pure C++ interface for per-process audio capture using the Windows 10 2004+
- * WASAPI Process Loopback API.  No N-API dependency — can be consumed by any
- * C++ code.
+ * Internal C++ interface for per-process audio capture using the Windows 10
+ * 2004+ WASAPI Process Loopback API.
  */
 
 #pragma once
 
-#include <string>
-#include <vector>
 #include <functional>
 #include <atomic>
 #include <thread>
 #include <cstdint>
-
-/* ── Audio app discovery ────────────────────────────────────────────────── */
-
-struct AudioAppInfo {
-    uint32_t    pid;
-    std::string name;   /* Display name (exe basename without .exe) */
-    std::string exe;    /* Executable filename */
-};
-
-/**
- * Enumerates Windows processes with active audio render sessions on the
- * default output device.  Returns one entry per unique executable (lowest
- * PID wins for duplicates like Discord / Electron multi-process apps).
- */
-std::vector<AudioAppInfo> listAudioApps();
 
 /* ── Per-process loopback capture stream ────────────────────────────────── */
 
@@ -60,9 +42,8 @@ public:
     ~AppCaptureStream();
 
     /**
-     * Start capture.  Activation happens on the calling thread (must have a
-     * COM STA apartment — the Electron/Node.js main thread satisfies this).
-     * The polling loop runs on a dedicated background thread.
+     * Start capture. Activation happens on the calling thread while the
+     * polling loop runs on a dedicated background thread.
      */
     void start(DataCallback callback, int outputChannels = 2);
 

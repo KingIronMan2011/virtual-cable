@@ -13,22 +13,6 @@ void engine_terminate() {
     Engine::terminate();
 }
 
-void engine_get_audio_devices(engine_device_cb cb, void* user_data) {
-    if (!cb) return;
-    auto devices = Engine::getAudioDevices();
-    for (const auto& dev : devices) {
-        cb(dev.id, dev.name.c_str(), dev.maxInputChannels, dev.maxOutputChannels, dev.hostAPIName.c_str(), dev.defaultSampleRate, user_data);
-    }
-}
-
-void engine_get_audio_apps(engine_app_cb cb, void* user_data) {
-    if (!cb) return;
-    auto apps = listAudioApps();
-    for (const auto& app : apps) {
-        cb(app.pid, app.name.c_str(), app.exe.c_str(), user_data);
-    }
-}
-
 void engine_create_tunnel(
     const char* tunnel_id,
     int num_inputs,
@@ -65,10 +49,6 @@ void engine_destroy_tunnel(const char* tunnel_id) {
 
 void engine_destroy_all_tunnels() {
     Engine::destroyAllTunnels();
-}
-
-void engine_reload_all_tunnels(int frames_per_buffer) {
-    Engine::reloadAllTunnels(frames_per_buffer);
 }
 
 void engine_set_tunnel_muted(const char* tunnel_id, bool muted) {

@@ -11,13 +11,6 @@ extern "C" {
 void engine_initialize();
 void engine_terminate();
 
-// Enumeration
-typedef void (*engine_device_cb)(int id, const char* name, int max_input, int max_output, const char* host_api, int default_sr, void* user_data);
-void engine_get_audio_devices(engine_device_cb cb, void* user_data);
-
-typedef void (*engine_app_cb)(uint32_t pid, const char* name, const char* exe, void* user_data);
-void engine_get_audio_apps(engine_app_cb cb, void* user_data);
-
 // Tunnel creation/management
 // For simplicity in C-ABI, we pass inputs as parallel arrays.
 void engine_create_tunnel(
@@ -37,7 +30,6 @@ void engine_create_tunnel(
 
 void engine_destroy_tunnel(const char* tunnel_id);
 void engine_destroy_all_tunnels();
-void engine_reload_all_tunnels(int frames_per_buffer);
 
 // Tunnel properties
 void engine_set_tunnel_muted(const char* tunnel_id, bool muted);

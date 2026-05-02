@@ -2,8 +2,7 @@
  * app_capture.cpp
  *
  * Per-process audio capture using the Windows 10 2004+ WASAPI
- * Process Loopback API.  Refactored from the original appCapture.cc
- * N-API addon into a pure C++ implementation.
+ * Process Loopback API.
  */
 
 #ifdef _WIN32
@@ -223,78 +222,6 @@ public:
 };
 
 /* ──────────────────────────────────────────────────────────────────────────
-   listAudioApps — enumerate processes with active render audio sessions
-─────────────────────────────────────────────────────────────────────────── */
-std::vector<AudioAppInfo> listAudioApps() {
-  std::vector<AudioAppInfo> apps;
-  CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-
-  IMMDeviceEnumerator*    pEnum = nullptr;
-  IMMDevice*              pDev  = nullptr;
-  IAudioSessionManager2*  pSM   = nullptr;
-  IAudioSessionEnumerator* pSE  = nullptr;
-
-  if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
-        CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&pEnum)))
-    goto done;
-  if (FAILED(pEnum->GetDefaultAudioEndpoint(eRender, eConsole, &pDev)))
-    goto done;
-  if (FAILED(pDev->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL,
-        nullptr, (void**)&pSM)))
-    goto done;
-  if (FAILED(pSM->GetSessionEnumerator(&pSE)))
-    goto done;
-
-  {
-    int count = 0;
-    pSE->GetCount(&count);
-    for (int i = 0; i < count; i++) {
-      IAudioSessionControl*  pCtl  = nullptr;
-      IAudioSessionControl2* pCtl2 = nullptr;
-      if (FAILED(pSE->GetSession(i, &pCtl))) continue;
-      if (FAILED(pCtl->QueryInterface(__uuidof(IAudioSessionControl2),
-            (void**)&pCtl2))) { pCtl->Release(); continue; }
-
-      DWORD pid = 0;
-      pCtl2->GetProcessId(&pid);
-      pCtl2->Release();
-      pCtl->Release();
-
-      if (pid == 0) continue;
-
-      bool found = false;
-      for (const auto& a : apps) if (a.pid == pid) { found = true; break; }
-      if (found) continue;
-
-      HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-      if (!hProc) continue;
-
-      wchar_t exePath[MAX_PATH] = {};
-      DWORD sz = MAX_PATH;
-      QueryFullProcessImageNameW(hProc, 0, exePath, &sz);
-      CloseHandle(hProc);
-
-      std::wstring fullPath(exePath);
-      std::wstring exeFile = fullPath.substr(fullPath.find_last_of(L"\\") + 1);
-      std::wstring dispName = exeFile;
-      if (dispName.size() > 4 &&
-          _wcsicmp(dispName.c_str() + dispName.size() - 4, L".exe") == 0)
-        dispName = dispName.substr(0, dispName.size() - 4);
-
-      apps.push_back({(uint32_t)pid, WideToUtf8(dispName), WideToUtf8(exeFile)});
-    }
-  }
-
-done:
-  if (pSE)   pSE->Release();
-  if (pSM)   pSM->Release();
-  if (pDev)  pDev->Release();
-  if (pEnum) pEnum->Release();
-  CoUninitialize();
-  return apps;
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
    AppCaptureStream — COM state
 ─────────────────────────────────────────────────────────────────────────── */
 struct AppCaptureStream::ComState {
@@ -426,8 +353,7 @@ void AppCaptureStream::start(DataCallback callback, int outputChannels) {
   outputChannels_ = std::max(1, std::min(2, outputChannels));
   callback_ = std::move(callback);
 
-  /* Activate process-loopback audio client (must run on a thread with a
-     proper COM apartment — the Node.js main thread satisfies this). */
+  /* Activate process-loopback audio client on the caller thread. */
   AUDIOCLIENT_ACTIVATION_PARAMS params = {};
   params.ActivationType = AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
   params.ProcessLoopbackParams.TargetProcessId   = (DWORD)pid_;
