@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { AudioDevice, Tunnel } from "../types";
 import { tauriAPI } from "../tauriAPI";
+import HotkeyInput from "./HotkeyInput";
 
 interface Props {
   tunnel: Tunnel;
@@ -216,7 +217,28 @@ export default function TunnelCard({
   const outputColShift = outputJackY - cableH / 2;
 
   return (
-    <div className={`cable-card${tunnel.active ? " is-active" : ""}`}>
+    <div
+      className={`cable-card${tunnel.active ? " is-active" : ""}`}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        // Don't trigger if user is typing in an input/select inside the card
+        if (
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLSelectElement
+        ) {
+          return;
+        }
+
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          if (canActivate) onToggleActive(tunnel.id);
+        }
+
+        if (e.key.toLowerCase() === "m") {
+          if (tunnel.active) onToggleMute(tunnel.id);
+        }
+      }}
+    >
       {/* ── Header: grip · name · delete ── */}
       <div className="card-head">
         <span className="card-grip" title="Drag to reorder">
@@ -270,13 +292,30 @@ export default function TunnelCard({
                 >
                   <option value="">— select —</option>
                   {inputDevices.length > 0 && (
-                    <optgroup label="Audio Devices">
-                      {inputDevices.map((d) => (
-                        <option key={`d:${d.id}`} value={`d:${d.id}`}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </optgroup>
+                    <>
+                      {inputDevices.some((d) => d.isVirtual) && (
+                        <optgroup label="VB-Audio Cables">
+                          {inputDevices
+                            .filter((d) => d.isVirtual)
+                            .map((d) => (
+                              <option key={`d:${d.id}`} value={`d:${d.id}`}>
+                                {d.name}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {inputDevices.some((d) => !d.isVirtual) && (
+                        <optgroup label="Hardware Devices">
+                          {inputDevices
+                            .filter((d) => !d.isVirtual)
+                            .map((d) => (
+                              <option key={`d:${d.id}`} value={`d:${d.id}`}>
+                                {d.name}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </>
                   )}
                   {audioApps.length > 0 && (
                     <optgroup label="Apps">
@@ -448,11 +487,32 @@ export default function TunnelCard({
             }
           >
             <option value="">— select —</option>
-            {outputDevices.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
+            {outputDevices.length > 0 && (
+              <>
+                {outputDevices.some((d) => d.isVirtual) && (
+                  <optgroup label="VB-Audio Cables">
+                    {outputDevices
+                      .filter((d) => d.isVirtual)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+                {outputDevices.some((d) => !d.isVirtual) && (
+                  <optgroup label="Hardware Devices">
+                    {outputDevices
+                      .filter((d) => !d.isVirtual)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                )}
+              </>
+            )}
           </select>
           {srLabel && <span className="io-meta">{srLabel}</span>}
         </div>
@@ -605,6 +665,14 @@ export default function TunnelCard({
             <Volume2 size={13} strokeWidth={2} />
           )}
         </button>
+
+        <div className="card-hotkey">
+          <HotkeyInput
+            value={tunnel.hotkey}
+            onChange={(val) => onUpdate({ ...tunnel, hotkey: val })}
+            placeholder="No key"
+          />
+        </div>
       </div>
     </div>
   );

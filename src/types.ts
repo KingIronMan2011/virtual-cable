@@ -3,6 +3,8 @@ export interface AudioDevice {
   name: string;
   maxInputChannels: number;
   maxOutputChannels: number;
+  isVirtual: boolean;
+  virtualLabel: string | null;
 }
 
 export interface TunnelInput {
@@ -33,6 +35,8 @@ export interface Tunnel {
   duckingAmount: number;
   /** Ducking release time in milliseconds (how quickly non-priority inputs recover). */
   duckingRelease: number;
+  /** Configurable hotkey to toggle this cable's active state. */
+  hotkey: string | null;
 }
 
 export interface AudioIOOptions {
@@ -53,6 +57,10 @@ export interface AppSettings {
   experimentalFeatures: boolean;
   expLatency: boolean;
   bufferSize: BufferSize;
+  hotkeys: {
+    addCable: string;
+    toggleSettings: string;
+  };
 }
 
 export type UpdateStatus =

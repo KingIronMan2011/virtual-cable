@@ -42,7 +42,7 @@ The current model is 1 input → 1 output. This tracks a richer mixing model:
 ## VB-Audio
 
 - [x] **Re-detect without restart** — after installing VB-Audio, add a "Re-scan devices" button so the user doesn't have to restart the app
-- [ ] **Support additional VB-Audio CABLE pairs** — VB-Audio offers A/B/C/D virtual cables; surface them clearly in the device list
+- [x] **Support additional VB-Audio CABLE pairs** — VB-Audio offers A/B/C/D virtual cables; surface them clearly in the device list
 
 ---
 
@@ -73,5 +73,5 @@ Effects applied in the signal chain between input and output, configurable per c
 
 ## Settings
 
-- [ ] **Keyboard shortcuts** — at minimum a shortcut to add a new cable and toggle the settings panel
+- [x] **Keyboard shortcuts** — at minimum a shortcut to enable/disable a cable, add a new cable, and toggle the settings panel
 - [x] **Export / import cable layout** — save a named preset of cables + device assignments to a JSON file for easy sharing or backup

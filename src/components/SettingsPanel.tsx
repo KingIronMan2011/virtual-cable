@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import packageJson from "../../package.json";
 import type { AppSettings, BufferSize, UpdateState } from "../types";
 import { tauriAPI } from "../tauriAPI";
+import HotkeyInput from "./HotkeyInput";
 
 interface Props {
   open: boolean;
@@ -63,6 +64,10 @@ export default function SettingsPanel({ open, onClose }: Props) {
     experimentalFeatures: false,
     expLatency: false,
     bufferSize: 512,
+    hotkeys: {
+      addCable: "Ctrl+Alt+N",
+      toggleSettings: "Ctrl+Alt+,",
+    },
   });
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: "idle",
@@ -72,7 +77,14 @@ export default function SettingsPanel({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     tauriAPI.loadSettings().then((s) => {
-      setSettings(s);
+      setSettings((prev) => ({
+        ...prev,
+        ...s,
+        hotkeys: {
+          ...prev.hotkeys,
+          ...(s.hotkeys || {}),
+        },
+      }));
       // Only check update state if autoUpdate is enabled
       if (s.autoUpdate) {
         tauriAPI.getUpdateState().then(setUpdateState);
@@ -229,6 +241,41 @@ export default function SettingsPanel({ open, onClose }: Props) {
                 />
                 <span className="toggle-slider" />
               </label>
+            </div>
+          </section>
+
+          {/* ── Shortcuts ── */}
+          <section className="settings-section">
+            <span className="settings-section-title">Shortcuts</span>
+            <div className="settings-rows">
+              <div className="settings-row">
+                <span className="settings-row-label">Add new cable</span>
+                <HotkeyInput
+                  value={settings.hotkeys?.addCable || null}
+                  onChange={(val) =>
+                    setSetting({
+                      hotkeys: {
+                        ...settings.hotkeys,
+                        addCable: val || "Ctrl+Alt+N",
+                      },
+                    })
+                  }
+                />
+              </div>
+              <div className="settings-row">
+                <span className="settings-row-label">Toggle settings</span>
+                <HotkeyInput
+                  value={settings.hotkeys?.toggleSettings || null}
+                  onChange={(val) =>
+                    setSetting({
+                      hotkeys: {
+                        ...settings.hotkeys,
+                        toggleSettings: val || "Ctrl+Alt+,",
+                      },
+                    })
+                  }
+                />
+              </div>
             </div>
           </section>
 

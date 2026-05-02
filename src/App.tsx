@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import {
   AlertCircle,
@@ -32,6 +33,10 @@ const SETTINGS_DEFAULTS: AppSettings = {
   experimentalFeatures: false,
   expLatency: false,
   bufferSize: 512,
+  hotkeys: {
+    addCable: "Ctrl+Alt+N",
+    toggleSettings: "Ctrl+Alt+,",
+  },
 };
 
 export default function App() {
@@ -40,7 +45,7 @@ export default function App() {
     { pid: number; name: string; exe: string }[]
   >([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
-  const [, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
+  const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
   const [vbModalOpen, setVbModalOpen] = useState(false);
   const [vbToastDismissed, setVbToastDismissed] = useState(false);
@@ -57,6 +62,8 @@ export default function App() {
   // IPC calls resolve and React has re-rendered), so they always see fresh state.
   const tunnelsRef = useRef<Tunnel[]>([]);
   tunnelsRef.current = tunnels;
+  const settingsRef = useRef<AppSettings>(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     Promise.all([
@@ -70,9 +77,28 @@ export default function App() {
       setDevices(devs);
       setAudioApps(apps);
       // Ensure tunnels start in an inactive state upon app launch
-      setTunnels(saved.map((t) => ({ ...t, active: false, muted: false })));
+      setTunnels(
+        saved.map((t, index) => ({
+          ...t,
+          active: false,
+          muted: false,
+          hotkey:
+            t.hotkey === undefined
+              ? index < 9
+                ? `Ctrl+Alt+Numpad${index + 1}`
+                : null
+              : t.hotkey,
+        })),
+      );
       setVbInstalled(installed);
-      setSettings(s);
+      setSettings((prev) => ({
+        ...prev,
+        ...s,
+        hotkeys: {
+          ...prev.hotkeys,
+          ...(s.hotkeys || {}),
+        },
+      }));
 
       // Restore window state if it exists
       if (windowState) {
@@ -174,10 +200,37 @@ export default function App() {
           duckingEnabled: false,
           duckingAmount: 0.15,
           duckingRelease: 1000,
+          hotkey: n <= 9 ? `Ctrl+Alt+Numpad${n}` : null,
         },
       ];
     });
   }, []);
+
+  const isHotkeyMatch = useCallback(
+    (e: KeyboardEvent, hotkeyStr: string | null) => {
+      if (!hotkeyStr) return false;
+      const parts = hotkeyStr.split("+").map((p) => p.trim().toLowerCase());
+      const key = parts.pop();
+      if (!key) return false;
+
+      // Handle special keys
+      const eventKey = e.key.toLowerCase();
+      if (eventKey !== key && e.code.toLowerCase() !== key) return false;
+
+      const ctrl = parts.includes("ctrl");
+      const shift = parts.includes("shift");
+      const alt = parts.includes("alt");
+      const meta = parts.includes("meta");
+
+      return (
+        e.ctrlKey === ctrl &&
+        e.shiftKey === shift &&
+        e.altKey === alt &&
+        e.metaKey === meta
+      );
+    },
+    [],
+  );
 
   const deleteTunnel = useCallback(async (id: string) => {
     await tauriAPI.destroyTunnel(id);
@@ -248,8 +301,49 @@ export default function App() {
         }
       });
     },
-    [enqueue],
+    [enqueue, isHotkeyMatch],
   );
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape: Close Settings (always active)
+      if (e.key === "Escape") {
+        setSettingsOpen(false);
+        return;
+      }
+
+      // Check global configurable hotkeys
+      const s = settingsRef.current;
+      if (isHotkeyMatch(e, s.hotkeys.addCable)) {
+        e.preventDefault();
+        addTunnel();
+        return;
+      }
+      if (isHotkeyMatch(e, s.hotkeys.toggleSettings)) {
+        e.preventDefault();
+        setSettingsOpen((prev) => !prev);
+        return;
+      }
+
+      // Check tunnel-specific hotkeys
+      for (const t of tunnelsRef.current) {
+        if (isHotkeyMatch(e, t.hotkey)) {
+          e.preventDefault();
+          toggleTunnelActive(t.id);
+          return;
+        }
+      }
+
+      // Escape: Close Settings (hardcoded fallback)
+      if (e.key === "Escape") {
+        setSettingsOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [addTunnel, settingsOpen, isHotkeyMatch, toggleTunnelActive]);
 
   // Toggle mute — reads from tunnelsRef at execution time.
   const toggleTunnelMute = useCallback(
@@ -373,54 +467,62 @@ export default function App() {
       for (const t of tunnelsRef.current) {
         if (t.active) await tauriAPI.destroyTunnel(t.id);
       }
-      const imported: Tunnel[] = parsed.map((t: Record<string, unknown>) => {
-        const inputs: TunnelInput[] =
-          Array.isArray(t.inputs) && t.inputs.length > 0
-            ? (
-                t.inputs as {
-                  deviceId?: unknown;
-                  appPid?: unknown;
-                  gain?: unknown;
-                  priority?: unknown;
-                }[]
-              ).map((inp) => ({
-                deviceId:
-                  typeof inp.deviceId === "number" ? inp.deviceId : null,
-                appPid: typeof inp.appPid === "number" ? inp.appPid : null,
-                gain: typeof inp.gain === "number" ? inp.gain : 1,
-                priority:
-                  typeof inp.priority === "boolean" ? inp.priority : false,
-              }))
-            : [
-                {
+      const imported: Tunnel[] = parsed.map(
+        (t: Record<string, unknown>, index) => {
+          const inputs: TunnelInput[] =
+            Array.isArray(t.inputs) && t.inputs.length > 0
+              ? (
+                  t.inputs as {
+                    deviceId?: unknown;
+                    appPid?: unknown;
+                    gain?: unknown;
+                    priority?: unknown;
+                  }[]
+                ).map((inp) => ({
                   deviceId:
-                    typeof t.inputDeviceId === "number"
-                      ? t.inputDeviceId
-                      : null,
-                  appPid: null,
-                  gain: 1,
-                  priority: false,
-                },
-              ];
-        return {
-          id: crypto.randomUUID(),
-          name: String(t.name ?? "Cable"),
-          inputs,
-          outputDeviceId:
-            typeof t.outputDeviceId === "number" ? t.outputDeviceId : null,
-          active: false,
-          muted: false,
-          channelCount:
-            typeof t.channelCount === "number" ? t.channelCount : null,
-          gain: typeof t.gain === "number" ? t.gain : 1,
-          duckingEnabled:
-            typeof t.duckingEnabled === "boolean" ? t.duckingEnabled : false,
-          duckingAmount:
-            typeof t.duckingAmount === "number" ? t.duckingAmount : 0.15,
-          duckingRelease:
-            typeof t.duckingRelease === "number" ? t.duckingRelease : 1000,
-        };
-      });
+                    typeof inp.deviceId === "number" ? inp.deviceId : null,
+                  appPid: typeof inp.appPid === "number" ? inp.appPid : null,
+                  gain: typeof inp.gain === "number" ? inp.gain : 1,
+                  priority:
+                    typeof inp.priority === "boolean" ? inp.priority : false,
+                }))
+              : [
+                  {
+                    deviceId:
+                      typeof t.inputDeviceId === "number"
+                        ? t.inputDeviceId
+                        : null,
+                    appPid: null,
+                    gain: 1,
+                    priority: false,
+                  },
+                ];
+          return {
+            id: crypto.randomUUID(),
+            name: String(t.name ?? "Cable"),
+            inputs,
+            outputDeviceId:
+              typeof t.outputDeviceId === "number" ? t.outputDeviceId : null,
+            active: false,
+            muted: false,
+            channelCount:
+              typeof t.channelCount === "number" ? t.channelCount : null,
+            gain: typeof t.gain === "number" ? t.gain : 1,
+            duckingEnabled:
+              typeof t.duckingEnabled === "boolean" ? t.duckingEnabled : false,
+            duckingAmount:
+              typeof t.duckingAmount === "number" ? t.duckingAmount : 0.15,
+            duckingRelease:
+              typeof t.duckingRelease === "number" ? t.duckingRelease : 1000,
+            hotkey:
+              typeof t.hotkey === "string"
+                ? t.hotkey
+                : index < 9
+                  ? `Ctrl+Alt+Numpad${index + 1}`
+                  : null,
+          };
+        },
+      );
       setTunnels(imported);
     } catch {
       // Silently ignore malformed files
@@ -482,6 +584,86 @@ export default function App() {
   const showToast =
     vbInstalled === false && !vbToastDismissed && installState === "idle";
   const showProgress = installState !== "idle" && installState !== "done";
+
+  // Sync global shortcuts with the OS
+  useEffect(() => {
+    if (!loaded.current) return;
+
+    let active = true;
+    const syncShortcuts = async () => {
+      console.log("Syncing global shortcuts...");
+      try {
+        await unregisterAll();
+        if (!active) return;
+
+        const toRegister: { key: string; action: () => void }[] = [];
+
+        // Global settings hotkeys
+        const normalize = (h: string) =>
+          h
+            .replace(/Ctrl/g, "Control")
+            .replace(/\+,$/, "+Comma")
+            .replace(/\+\.$/, "+Period")
+            .replace(/\+\/$/, "+Slash")
+            .replace(/\+\\$/, "+Backslash")
+            .replace(/\+-$/, "+Minus")
+            .replace(/\+=$/, "+Equal");
+
+        if (settings.hotkeys.addCable) {
+          toRegister.push({
+            key: normalize(settings.hotkeys.addCable),
+            action: addTunnel,
+          });
+        }
+        if (settings.hotkeys.toggleSettings) {
+          toRegister.push({
+            key: normalize(settings.hotkeys.toggleSettings),
+            action: () => setSettingsOpen((prev) => !prev),
+          });
+        }
+
+        // Tunnel-specific hotkeys
+        for (const t of tunnels) {
+          if (t.hotkey) {
+            toRegister.push({
+              key: normalize(t.hotkey),
+              action: () => toggleTunnelActive(t.id),
+            });
+          }
+        }
+
+        for (const { key, action } of toRegister) {
+          try {
+            console.log(`Registering global shortcut: ${key}`);
+            await register(key, (event) => {
+              if (event.state === "Pressed") {
+                console.log(`Global shortcut triggered: ${key}`);
+                action();
+              }
+            });
+          } catch (err) {
+            console.error(`Failed to register global shortcut ${key}:`, err);
+          }
+        }
+        console.log("Global shortcuts sync complete.");
+      } catch (err) {
+        console.error("Failed to sync global shortcuts:", err);
+      }
+    };
+
+    syncShortcuts();
+    return () => {
+      active = false;
+      unregisterAll();
+    };
+  }, [
+    loaded,
+    settings.hotkeys,
+    // Only re-sync if tunnel IDs or their hotkeys change
+    JSON.stringify(tunnels.map((t) => ({ id: t.id, hotkey: t.hotkey }))),
+    addTunnel,
+    toggleTunnelActive,
+  ]);
 
   const progressLabel: Record<InstallState, string> = {
     idle: "",

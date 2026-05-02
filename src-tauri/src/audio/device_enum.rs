@@ -9,6 +9,8 @@ pub struct AudioDevice {
     pub max_output_channels: i32,
     pub default_sample_rate: i32,
     pub host_api_name: String,
+    pub is_virtual: bool,
+    pub virtual_label: Option<String>,
 }
 
 pub fn is_valid_device_name(name: &str) -> bool {
@@ -63,6 +65,24 @@ pub fn get_audio_devices() -> Vec<AudioDevice> {
                     continue;
                 }
 
+                let name_lower = name.to_lowercase();
+                let is_virtual = name_lower.contains("vb-audio") || name_lower.contains("cable");
+                let mut virtual_label = None;
+
+                if is_virtual {
+                    if name_lower.contains("cable-a") || name_lower.contains("cable a") {
+                        virtual_label = Some("A".to_string());
+                    } else if name_lower.contains("cable-b") || name_lower.contains("cable b") {
+                        virtual_label = Some("B".to_string());
+                    } else if name_lower.contains("cable-c") || name_lower.contains("cable c") {
+                        virtual_label = Some("C".to_string());
+                    } else if name_lower.contains("cable-d") || name_lower.contains("cable d") {
+                        virtual_label = Some("D".to_string());
+                    } else if name_lower.contains("virtual cable") {
+                        virtual_label = Some("V".to_string());
+                    }
+                }
+
                 devices.push(AudioDevice {
                     id: id_counter,
                     name,
@@ -70,6 +90,8 @@ pub fn get_audio_devices() -> Vec<AudioDevice> {
                     max_output_channels: max_output,
                     default_sample_rate: default_sr,
                     host_api_name: host_name.clone(),
+                    is_virtual,
+                    virtual_label,
                 });
                 id_counter += 1;
             }

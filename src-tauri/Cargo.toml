@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.4.0"
+version = "1.4.1"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -26,6 +26,7 @@ tauri-plugin-updater = "2"
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2.7.0"
 tauri-plugin-fs = "2.5.0"
+tauri-plugin-global-shortcut = "2"
 winreg = "0.51"
 parking_lot = "0.12"
 tokio = { version = "1.0", features = ["sync", "rt"] }

@@ -214,6 +214,12 @@ body::after {
   border-color: var(--color-border-hi);
 }
 
+.cable-card:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
 .cable-card.is-active {
   border-left-color: var(--color-active);
   box-shadow:
@@ -1571,4 +1577,99 @@ body::after {
 .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(16px);
   background: var(--color-active);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Hotkey Input
+   ───────────────────────────────────────────────────────────────── */
+.hotkey-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hotkey-label {
+  font-size: 0.58rem;
+  font-weight: 300;
+  color: var(--color-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.hotkey-field-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.hotkey-record-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface-hi);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 100px;
+}
+
+.hotkey-record-btn:hover {
+  border-color: var(--color-border-hi);
+  background: color-mix(in srgb, var(--color-surface-hi) 95%, white);
+}
+
+.hotkey-record-btn.is-recording {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+}
+
+.hotkey-record-btn.is-empty {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.hotkey-value {
+  flex: 1;
+  text-align: left;
+}
+
+.hotkey-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.15s;
+}
+
+.hotkey-clear:hover {
+  color: #e05555;
+  background: color-mix(in srgb, #e05555 10%, transparent);
+}
+
+.card-hotkey {
+  margin-left: auto;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.cable-card:hover .card-hotkey,
+.cable-card:focus-within .card-hotkey {
+  opacity: 1;
+}
+
+/* Specific adjustments for settings rows with hotkeys */
+.settings-row .hotkey-input-container {
+  min-width: 140px;
 }

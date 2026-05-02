@@ -20,6 +20,8 @@ struct AudioDeviceDTO {
     maxOutputChannels: i32,
     hostAPIName: String,
     defaultSampleRate: i32,
+    isVirtual: bool,
+    virtualLabel: Option<String>,
 }
 
 /// Serializable audio app for UI
@@ -69,6 +71,8 @@ fn get_devices() -> Vec<AudioDeviceDTO> {
             maxOutputChannels: d.max_output_channels,
             hostAPIName: d.host_api_name,
             defaultSampleRate: d.default_sample_rate,
+            isVirtual: d.is_virtual,
+            virtualLabel: d.virtual_label,
         })
         .collect()
 }
@@ -201,10 +205,13 @@ fn load_settings(app: AppHandle) -> serde_json::Value {
         serde_json::json!({
             "autoUpdate": true,
             "minimizeToTray": false,
-            "experimentalFeatures": false,
             "expLatency": false,
             "bufferSize": 512,
-            "expSampleRate": false
+            "expSampleRate": false,
+            "hotkeys": {
+                "addCable": "Ctrl+Alt+N",
+                "toggleSettings": "Ctrl+Alt+,"
+            }
         })
     }
 }
@@ -316,6 +323,7 @@ pub fn run() {
             audio::engine::set_level_callback(on_audio_level);
             Ok(())
         })
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_devices,
             get_audio_apps,
