@@ -57,7 +57,11 @@ jobs:
 
       - name: Create .env file
         run: |
-          "TAURI_SIGNING_PRIVATE_KEY=${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}`nTAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" | Out-File -FilePath .env -Encoding utf8 -NoNewline
+          $envContent = @"
+          TAURI_SIGNING_PRIVATE_KEY=${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          "@
+              $envContent | Out-File -FilePath .env -Encoding utf8
 
       - name: Build installer
         run: npm run build
