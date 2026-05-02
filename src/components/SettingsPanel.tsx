@@ -14,7 +14,7 @@ const VERSION = packageJson.version;
 const STATUS_LABEL: Record<UpdateState["status"], string> = {
   idle: "",
   checking: "Checking…",
-  available: "Downloading update…",
+  available: "Update available",
   "not-available": "Up to date",
   ready: "Ready to install",
   error: "Check failed",
@@ -51,8 +51,13 @@ export default function SettingsPanel({ open, onClose }: Props) {
   // Load settings and current update state on open
   useEffect(() => {
     if (!open) return;
-    tauriAPI.loadSettings().then(setSettings);
-    tauriAPI.getUpdateState().then(setUpdateState);
+    tauriAPI.loadSettings().then((s) => {
+      setSettings(s);
+      // Only check update state if autoUpdate is enabled
+      if (s.autoUpdate) {
+        tauriAPI.getUpdateState().then(setUpdateState);
+      }
+    });
   }, [open]);
 
   // Subscribe to live update status pushes from main process
@@ -94,12 +99,23 @@ export default function SettingsPanel({ open, onClose }: Props) {
     }
   }, []);
 
+  const downloadUpdate = useCallback(async () => {
+    if (updateState.status === "available") {
+      setUpdateState({ status: "checking" }); // Use "checking" to show downloading progress
+      try {
+        await tauriAPI.installUpdate();
+      } catch {
+        setUpdateState({ status: "error", error: "Failed to download update" });
+        setTimeout(() => setUpdateState({ status: "idle" }), 3000);
+      }
+    }
+  }, [updateState.status]);
+
   const installNow = useCallback(() => {
     tauriAPI.installUpdate();
   }, []);
 
-  const isChecking =
-    updateState.status === "checking" || updateState.status === "available";
+  const isChecking = updateState.status === "checking";
 
   const statusText = STATUS_LABEL[updateState.status];
 
@@ -297,6 +313,14 @@ export default function SettingsPanel({ open, onClose }: Props) {
               {updateState.status === "ready" ? (
                 <button className="btn-primary" onClick={installNow}>
                   Restart &amp; Install
+                </button>
+              ) : updateState.status === "available" ? (
+                <button
+                  className="btn-primary"
+                  onClick={downloadUpdate}
+                  disabled={isChecking}
+                >
+                  Download Update
                 </button>
               ) : (
                 <button

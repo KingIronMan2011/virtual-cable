@@ -13,7 +13,7 @@ import {
 import { LuGithub } from "react-icons/lu";
 
 const GITHUB_URL = "https://github.com/KingIronMan2011/virtual-cable";
-const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
+const DIRECT_DOWNLOAD_URL = `/releases/Virtual Cable_${__APP_VERSION__}_x64-setup.exe`;
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
@@ -36,9 +36,8 @@ function Header() {
             GitHub
           </a>
           <a
-            href={RELEASES_URL}
-            target="_blank"
-            rel="noreferrer"
+            href={DIRECT_DOWNLOAD_URL}
+            download
             className="flex items-center gap-1.5 text-sm bg-brand hover:bg-brand-dim text-black font-medium px-3 py-1.5 rounded-md transition-colors"
           >
             <Download size={14} />
@@ -107,9 +106,8 @@ function Hero() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <a
-            href={RELEASES_URL}
-            target="_blank"
-            rel="noreferrer"
+            href={DIRECT_DOWNLOAD_URL}
+            download
             className="flex items-center gap-2 bg-brand hover:bg-brand-dim text-black font-semibold px-5 py-2.5 rounded-lg transition-colors"
           >
             <Download size={16} />
@@ -271,9 +269,8 @@ function DownloadCTA() {
           count.
         </p>
         <a
-          href={RELEASES_URL}
-          target="_blank"
-          rel="noreferrer"
+          href={DIRECT_DOWNLOAD_URL}
+          download
           className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dim text-black font-semibold px-6 py-3 rounded-lg transition-colors text-sm"
         >
           <Download size={16} />
