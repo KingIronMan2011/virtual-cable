@@ -142,7 +142,6 @@ export default function SettingsPanel({ open, onClose }: Props) {
             <span className="settings-section-title">About</span>
 
             <div className="about-brand">VIRTUAL CABLE</div>
-            <div className="about-sub">Patchbay for Windows</div>
 
             <div className="settings-rows">
               <div className="settings-row">
@@ -150,8 +149,8 @@ export default function SettingsPanel({ open, onClose }: Props) {
                 <span className="settings-row-val">{VERSION}</span>
               </div>
               <div className="settings-row">
-                <span className="settings-row-label">License</span>
-                <span className="settings-row-val">MIT · KingIronMan2011</span>
+                <span className="settings-row-label">Made by</span>
+                <span className="settings-row-val">KingIronMan2011</span>
               </div>
               <div className="settings-row">
                 <span className="settings-row-label">Built with</span>
