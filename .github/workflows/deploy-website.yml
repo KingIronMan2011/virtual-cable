@@ -47,7 +47,7 @@ jobs:
             "pub_date": "$PUB_DATE",
             "platforms": {
               "windows-x86_64": {
-                "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIzQ0Q0NjA5MjBCMTY3QUYKUldTdlo3RWdDVWJOczFSYk1iSDRibUNKa2VXdU9aMlpPUmtYL1FWUE4rVktzbzJQVjdIWVNiWUMK",
+                "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI1NDcyODJGRDAyN0FCREMKUldUY3F5ZlFMeWhIdFVPbENUMTRUQmNnTTlTbmdQWGFEZnluTWZNbzJ5QkpEbzM0bmMra2EwQnAK",
                 "url": "https://virtual-cable.kingironman.dev/releases/Virtual Cable_${VERSION}_x64-setup.exe"
               }
             }
