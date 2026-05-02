@@ -1,6 +1,6 @@
 # Virtual Cable
 
-A desktop app for creating on-demand audio tunnels between any input and output devices on your system. Built with Electron, React, TypeScript, and Tailwind CSS v4.
+A desktop app for creating on-demand audio tunnels between any input and output devices on your system. Built with Tauri, React, TypeScript, and Rust.
 
 ![License](https://img.shields.io/badge/license-MIT-amber) ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 
@@ -19,9 +19,11 @@ For virtual devices visible to other applications (DAWs, browsers, OBS, etc.), i
 Before building, make sure you have the following installed:
 
 - **Node.js** v18 or later — [nodejs.org](https://nodejs.org)
-- **Visual Studio Build Tools** with the **Desktop development with C++** workload — required to compile the native `naudiodon` audio addon
+- **Rust** v1.77 or later — [rustup.rs](https://rustup.rs/)
+- **Visual Studio Build Tools** with the **Desktop development with C++** workload — required to compile the native C++ audio engine
   - Download: [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
   - During install, check **Desktop development with C++**
+- **Tauri CLI** — installed automatically via `npm install`
 
 ---
 
@@ -35,79 +37,48 @@ cd virtual-cable
 npm install
 ```
 
-`npm install` automatically runs `electron-rebuild` to compile the native PortAudio addon for your Electron version.
-
 ### 2. Start in development mode
 
 ```bash
-npm start
+npm run tauri dev
 ```
 
-This launches Electron with hot-reload via Vite. The app opens immediately.
+This launches Tauri with hot-reload via Vite. The app opens immediately with the Rust backend compiled.
 
 ---
 
 ## Building an installer
 
-Virtual Cable uses [Electron Forge](https://www.electronforge.io/) to package and create installers.
-
-### Package (no installer, just the app folder)
+Virtual Cable uses Tauri's built-in packaging system to create installers.
 
 ```bash
-npm run package
+npm run build
 ```
 
-Output is placed in:
+This produces a **Windows Installer (MSI)** and **NSIS installer** in:
 
 ```dir
-out/virtual-cable-win32-x64/
+src-tauri/target/release/bundle/
 ```
 
-The main executable is:
+You'll find:
 
-```dir
-out/virtual-cable-win32-x64/virtual-cable.exe
-```
+| File                                      | Description                    |
+| ----------------------------------------- | ------------------------------ |
+| `Virtual Cable_1.X.X_x64-setup.exe`       | NSIS portable installer        |
+| `Virtual Cable_1.X.X_x64-setup.exe.sig`   | Update signature (for updater) |
 
-You can run this `.exe` directly without installing anything.
+### Installing
 
----
-
-### Make (creates a proper installer)
-
-```bash
-npm run make
-```
-
-This produces a **Squirrel Windows installer** (`.exe` setup file) in:
-
-```dir
-out/make/squirrel.windows/x64/
-```
-
-Inside that folder you will find:
-
-| File                             | Description                                    |
-| -------------------------------- | ---------------------------------------------- |
-| `virtual-cable-1.X.X Setup.exe`  | The installer — run this to install the app    |
-| `virtual-cable-1.X.X-full.nupkg` | Squirrel update package                        |
-| `RELEASES`                       | Release manifest used by Squirrel auto-updater |
-
-#### Installing
-
-1. Run `virtual-cable-1.X.X Setup.exe`
-2. The app installs silently and launches automatically
+1. Run `Virtual Cable_1.X.X_x64-setup.exe`
+2. The app installs and launches automatically
 3. After installation, find it in:
    - **Start Menu** → Virtual Cable
    - **`%LocalAppData%\virtual-cable\`**
 
-#### Uninstalling
+### Uninstalling
 
-Go to **Settings → Apps** and uninstall **Virtual Cable** from there, or run:
-
-```dir
-%LocalAppData%\virtual-cable\Update.exe --uninstall
-```
+Go to **Settings → Apps → Installed apps** and uninstall **Virtual Cable**, or use your installer's uninstall option.
 
 ---
 
@@ -126,14 +97,15 @@ VB-Audio Virtual Cable is free software by VB-Audio Software.
 
 ## Tech stack
 
-| Layer     | Technology                    |
-| --------- | ----------------------------- |
-| Shell     | Electron 41                   |
-| UI        | React 19 + TypeScript         |
-| Styling   | Tailwind CSS v4               |
-| Build     | Electron Forge v7 + Vite      |
-| Audio     | naudiodon (PortAudio binding) |
-| Installer | Squirrel.Windows              |
+| Layer     | Technology                              |
+| --------- | --------------------------------------- |
+| Shell     | Tauri 2.x                               |
+| UI        | React 19 + TypeScript                   |
+| Styling   | Tailwind CSS v4                         |
+| Build     | Vite                                    |
+| Backend   | Rust + C++ (PortAudio + WASAPI)         |
+| Audio     | C++ engine with PortAudio integration   |
+| Installer | Tauri bundler (MSI + NSIS)              |
 
 ---
 
