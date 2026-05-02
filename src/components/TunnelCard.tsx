@@ -34,7 +34,6 @@ interface Props {
   ) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
-  expSampleRate: boolean;
 }
 
 function dbLabel(gain: number, decimals = 1) {
@@ -55,7 +54,6 @@ export default function TunnelCard({
   onSetDucking,
   onRename,
   onDelete,
-  expSampleRate,
 }: Props) {
   const inputDevices = devices.filter((d) => d.maxInputChannels > 0);
   const outputDevices = devices.filter((d) => d.maxOutputChannels > 0);
@@ -132,18 +130,16 @@ export default function TunnelCard({
       return;
     }
     let cancelled = false;
-    if (expSampleRate) {
-      tauriAPI.getTunnelSampleRate(tunnel.id).then((v) => {
-        if (!cancelled) setSampleRate(v);
-      });
-    }
+    tauriAPI.getTunnelSampleRate(tunnel.id).then((v) => {
+      if (!cancelled) setSampleRate(v);
+    });
     tauriAPI.getTunnelChannelCount(tunnel.id).then((v) => {
       if (!cancelled) setActiveChannelCount(v);
     });
     return () => {
       cancelled = true;
     };
-  }, [tunnel.active, tunnel.id, expSampleRate]);
+  }, [tunnel.active, tunnel.id]);
 
   useEffect(() => {
     if (editing) {
@@ -458,7 +454,7 @@ export default function TunnelCard({
               </option>
             ))}
           </select>
-          {expSampleRate && srLabel && (
+          {srLabel && (
             <span className="io-meta">{srLabel}</span>
           )}
         </div>

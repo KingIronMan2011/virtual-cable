@@ -25,7 +25,6 @@ interface Props {
   onRename: (id: string, name: string) => void;
   onReorder: (from: number, to: number) => void;
   onDelete: (id: string) => void;
-  expSampleRate: boolean;
 }
 
 export default function TunnelList({
@@ -42,7 +41,6 @@ export default function TunnelList({
   onRename,
   onReorder,
   onDelete,
-  expSampleRate,
 }: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -122,7 +120,6 @@ export default function TunnelList({
             onSetDucking={onSetDucking}
             onRename={onRename}
             onDelete={onDelete}
-            expSampleRate={expSampleRate}
           />
         </div>
       ))}

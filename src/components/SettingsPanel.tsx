@@ -42,7 +42,6 @@ export default function SettingsPanel({ open, onClose }: Props) {
     experimentalFeatures: false,
     expLatency: false,
     bufferSize: 512,
-    expSampleRate: false,
   });
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: "idle",
@@ -228,30 +227,6 @@ export default function SettingsPanel({ open, onClose }: Props) {
                       ))}
                     </div>
                   )}
-                </div>
-
-                {/* ── Sample rate display ── */}
-                <div className="exp-feature">
-                  <div className="settings-toggle-row exp-feature-toggle">
-                    <div className="settings-toggle-text">
-                      <span className="settings-toggle-label">
-                        Sample rate display
-                      </span>
-                      <span className="settings-toggle-sub">
-                        Show the negotiated sample rate on each active cable.
-                      </span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.expSampleRate}
-                        onChange={(e) =>
-                          setSetting({ expSampleRate: e.target.checked })
-                        }
-                      />
-                      <span className="toggle-slider" />
-                    </label>
-                  </div>
                 </div>
               </div>
             )}

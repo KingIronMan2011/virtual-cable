@@ -10,7 +10,7 @@ A running list of potential improvements and features.
 - [x] **Mute toggle per cable** — silence a cable without destroying the stream
 - [x] **VU meter** — real-time input level indicator on each card so you can confirm audio is actually flowing
 - [x] **Latency / buffer size setting** — expose PortAudio's `framesPerBuffer` as a user-facing low/medium/high latency option
-- [x] **Sample rate display** — show the negotiated sample rate on each active cable for debugging
+- [x] **Sample rate detection & display** — auto-detect and display the negotiated sample rate for each cable; persists to config
 - [x] **Multi-channel support** — currently capped at stereo; allow mono selection for microphones that perform better in mono
 
 ---
@@ -49,10 +49,9 @@ The current model is 1 input → 1 output. This tracks a richer mixing model:
 ## Distribution / CI
 
 - [ ] **Code signing (Windows)** — sign the installer with an EV certificate to avoid SmartScreen warnings on first run
-- [ ] **Code signing (macOS)** — required for Squirrel auto-update to work on macOS; needs an Apple Developer account and notarization
-- [x] **Universal macOS binary** — build a single `arm64 + x64` app with `arch: 'universal'` in Forge so one release covers all Macs natively
-- [x] **Intel macOS build** — covered by the universal binary above
-- [ ] **Delta updates** — generate delta `.nupkg` files so updates only download the diff rather than the full package
+- [x] **Auto-updates via Tauri updater** — use Tauri's built-in updater plugin with custom server for auto-updates
+- [x] **GitHub Actions CI/CD** — automated builds on push, version detection, and release creation
+- [x] **Release signing** — sign updates with Ed25519 key for security verification
 
 ---
 

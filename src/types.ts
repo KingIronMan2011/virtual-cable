@@ -52,7 +52,6 @@ export interface AppSettings {
   experimentalFeatures: boolean;
   expLatency: boolean;
   bufferSize: BufferSize;
-  expSampleRate: boolean;
 }
 
 export type UpdateStatus =

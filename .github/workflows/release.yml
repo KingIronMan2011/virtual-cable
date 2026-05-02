@@ -52,7 +52,6 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # postinstall runs electron-rebuild for naudiodon + segfault-handler
         run: npm ci
 
       - name: Create .env file

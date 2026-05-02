@@ -29,7 +29,6 @@ const SETTINGS_DEFAULTS: AppSettings = {
   experimentalFeatures: false,
   expLatency: false,
   bufferSize: 512,
-  expSampleRate: false,
 };
 
 export default function App() {
@@ -38,7 +37,7 @@ export default function App() {
     { pid: number; name: string; exe: string }[]
   >([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
+  const [, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
   const [vbModalOpen, setVbModalOpen] = useState(false);
   const [vbToastDismissed, setVbToastDismissed] = useState(false);
@@ -510,9 +509,6 @@ export default function App() {
             onRename={renameTunnel}
             onReorder={reorderTunnels}
             onDelete={deleteTunnel}
-            expSampleRate={
-              settings.experimentalFeatures && settings.expSampleRate
-            }
           />
         </div>
       </main>
