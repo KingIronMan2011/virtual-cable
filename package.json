@@ -16,7 +16,7 @@
     "types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^25.5.2",
@@ -24,9 +24,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^9.39.4",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint": "^10.3.0",
     "pathe": "^2.0.3",
     "prettier": "^3.8.1",
     "sharp": "^0.34.5",

@@ -28,7 +28,10 @@ const ICONS = [
 async function buildIcons() {
   await Promise.all(
     ICONS.map(({ name, size }) =>
-      sharp(`${PATH}/icon.svg`).resize(size, size).png().toFile(path.join(PATH, name)),
+      sharp(`${PATH}/icon.svg`)
+        .resize(size, size)
+        .png()
+        .toFile(path.join(PATH, name)),
     ),
   );
 

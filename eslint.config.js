@@ -1,36 +1,17 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
-import reactPlugin from "eslint-plugin-react";
-import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
   // Ignore build output and generated files
   {
-    ignores: [
-      ".vite/**",
-      "dist/**",
-      "out/**",
-      "node_modules/**",
-      ".git/**",
-      "src-tauri/target/**",
-      "coverage/**",
-      "forge.config.ts",
-    ],
+    ignores: ["dist/**", "node_modules/**", "src-tauri/target/**"],
   },
 
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
 
   {
-    plugins: {
-      react: reactPlugin,
-      "react-hooks": reactHooksPlugin,
-    },
     rules: {
-      // React 17+ JSX transform — no need to import React in every file
-      "react/react-in-jsx-scope": "off",
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
       // Allow _prefixed args to be unused (common pattern in IPC callbacks)
       "@typescript-eslint/no-unused-vars": [
         "warn",

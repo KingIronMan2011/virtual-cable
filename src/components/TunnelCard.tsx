@@ -454,9 +454,7 @@ export default function TunnelCard({
               </option>
             ))}
           </select>
-          {srLabel && (
-            <span className="io-meta">{srLabel}</span>
-          )}
+          {srLabel && <span className="io-meta">{srLabel}</span>}
         </div>
       </div>
 
