@@ -39,6 +39,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
   const [settings, setSettings] = useState<AppSettings>({
     autoUpdate: false,
     minimizeToTray: false,
+    launchOnStartup: false,
     experimentalFeatures: false,
     expLatency: false,
     bufferSize: 512,
@@ -64,6 +65,12 @@ export default function SettingsPanel({ open, onClose }: Props) {
     async (patch: Partial<typeof settings>) => {
       const next = { ...settings, ...patch };
       setSettings(next);
+      
+      // Handle Windows startup registry separately
+      if ("launchOnStartup" in patch) {
+        await tauriAPI.setLaunchOnStartup(patch.launchOnStartup!);
+      }
+      
       await tauriAPI.saveSettings(next);
     },
     [settings],
@@ -156,6 +163,25 @@ export default function SettingsPanel({ open, onClose }: Props) {
                   checked={settings.minimizeToTray}
                   onChange={(e) =>
                     setSetting({ minimizeToTray: e.target.checked })
+                  }
+                />
+                <span className="toggle-slider" />
+              </label>
+            </div>
+
+            <div className="settings-toggle-row">
+              <div className="settings-toggle-text">
+                <span className="settings-toggle-label">Launch on Windows startup</span>
+                <span className="settings-toggle-sub">
+                  Automatically start the app when your computer boots
+                </span>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={settings.launchOnStartup}
+                  onChange={(e) =>
+                    setSetting({ launchOnStartup: e.target.checked })
                   }
                 />
                 <span className="toggle-slider" />

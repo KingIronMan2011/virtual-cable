@@ -3,6 +3,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use tauri::{AppHandle, Manager, Emitter};
 use std::sync::OnceLock;
+use winreg::RegKey;
 
 // --- FFI Imports ---
 
@@ -298,6 +299,80 @@ fn save_settings(app: AppHandle, settings: serde_json::Value) {
     let _ = fs::write(path, content);
 }
 
+// --- Window State ---
+
+#[derive(Serialize, Deserialize)]
+struct WindowState {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+}
+
+#[tauri::command]
+fn load_window_state(app: AppHandle) -> Option<WindowState> {
+    let path = get_data_dir(&app).join("window.json");
+    if path.exists() {
+        let content = fs::read_to_string(path).ok()?;
+        serde_json::from_str(&content).ok()
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+fn save_window_state(app: AppHandle, state: WindowState) {
+    let path = get_data_dir(&app).join("window.json");
+    if let Ok(content) = serde_json::to_string_pretty(&state) {
+        let _ = fs::write(path, content);
+    }
+}
+
+// --- Windows Startup ---
+
+#[tauri::command]
+fn set_launch_on_startup(_app: AppHandle, enable: bool) -> Result<(), String> {
+    let hkcu = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+    let run_key = hkcu
+        .open_subkey_with_flags(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            winreg::enums::KEY_WRITE,
+        )
+        .map_err(|e| format!("Failed to open Run registry key: {}", e))?;
+
+    if enable {
+        // Get the app executable path
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("Failed to get executable path: {}", e))?
+            .to_string_lossy()
+            .to_string();
+        
+        run_key
+            .set_value("VirtualCable", &exe_path)
+            .map_err(|e| format!("Failed to set registry value: {}", e))?
+    } else {
+        // Remove from startup
+        let _ = run_key.delete_value("VirtualCable");
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_launch_on_startup() -> Result<bool, String> {
+    let hkcu = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+    match hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run") {
+        Ok(run_key) => {
+            // Try to get the value; if it doesn't exist, get_value will return Err
+            match run_key.get_value::<String, &str>("VirtualCable") {
+                Ok(_) => Ok(true),
+                Err(_) => Ok(false), // Value not found
+            }
+        }
+        Err(_) => Ok(false), // Key doesn't exist, so not in startup
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -431,6 +506,10 @@ pub fn run() {
             save_tunnels,
             load_settings,
             save_settings,
+            load_window_state,
+            save_window_state,
+            set_launch_on_startup,
+            get_launch_on_startup,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

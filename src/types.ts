@@ -49,6 +49,7 @@ export type BufferSize = 256 | 512 | 1024;
 export interface AppSettings {
   autoUpdate: boolean;
   minimizeToTray: boolean;
+  launchOnStartup: boolean;
   experimentalFeatures: boolean;
   expLatency: boolean;
   bufferSize: BufferSize;

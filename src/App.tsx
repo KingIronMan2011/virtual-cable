@@ -1,4 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import {
   AlertCircle,
   CheckCircle2,
@@ -26,6 +28,7 @@ import { tauriAPI } from "./tauriAPI";
 const SETTINGS_DEFAULTS: AppSettings = {
   autoUpdate: false,
   minimizeToTray: false,
+  launchOnStartup: false,
   experimentalFeatures: false,
   expLatency: false,
   bufferSize: 512,
@@ -62,13 +65,28 @@ export default function App() {
       tauriAPI.checkVBAudioInstalled(),
       tauriAPI.loadSettings(),
       tauriAPI.getAudioApps(),
-    ]).then(([devs, saved, installed, s, apps]) => {
+      tauriAPI.loadWindowState(),
+    ]).then(([devs, saved, installed, s, apps, windowState]) => {
       setDevices(devs);
       setAudioApps(apps);
       // Ensure tunnels start in an inactive state upon app launch
       setTunnels(saved.map((t) => ({ ...t, active: false, muted: false })));
       setVbInstalled(installed);
       setSettings(s);
+      
+      // Restore window state if it exists
+      if (windowState) {
+        (async () => {
+          const appWindow = WebviewWindow.getCurrent();
+          await appWindow.setPosition(
+            new LogicalPosition(windowState.x, windowState.y),
+          );
+          await appWindow.setSize(
+            new LogicalSize(windowState.width, windowState.height),
+          );
+        })();
+      }
+      
       loaded.current = true;
     });
   }, []);
@@ -79,6 +97,50 @@ export default function App() {
     const toSave = tunnels.map((t) => ({ ...t, active: false, muted: false }));
     tauriAPI.saveTunnels(toSave);
   }, [tunnels]);
+
+  // Listen for window move/resize and save state
+  useEffect(() => {
+    if (!loaded.current) return;
+
+    (async () => {
+      const appWindow = WebviewWindow.getCurrent();
+
+      // Save window state on move or resize
+      const saveWindowState = async () => {
+        const pos = await appWindow.outerPosition();
+        const size = await appWindow.outerSize();
+        await tauriAPI.saveWindowState({
+          x: Math.round(pos.x),
+          y: Math.round(pos.y),
+          width: Math.round(size.width),
+          height: Math.round(size.height),
+        });
+      };
+
+      // Debounce the save to avoid too frequent writes
+      let saveTimer: ReturnType<typeof setTimeout> | null = null;
+      const debouncedSave = () => {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveWindowState, 500);
+      };
+
+      // Listen for move and resize events
+      const unlistenMove = await appWindow.onMoved(debouncedSave);
+      const unlistenResize = await appWindow.onResized(debouncedSave);
+
+      // Save on window close
+      const unlistenCloseRequested = await appWindow.onCloseRequested(
+        saveWindowState,
+      );
+
+      return () => {
+        unlistenMove();
+        unlistenResize();
+        unlistenCloseRequested();
+        if (saveTimer) clearTimeout(saveTimer);
+      };
+    })();
+  }, []);
 
   // Poll for newly started audio apps every 3 s so the user doesn't need to restart.
   useEffect(() => {

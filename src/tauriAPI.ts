@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { check } from "@tauri-apps/plugin-updater";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "./types";
 
@@ -44,8 +46,6 @@ export const tauriAPI = {
     invoke("save_tunnels", { tunnels }),
 
   exportLayout: async (json: string): Promise<boolean> => {
-    const { save } = await import("@tauri-apps/plugin-dialog");
-    const { writeTextFile } = await import("@tauri-apps/plugin-fs");
     const path = await save({
       filters: [{ name: "JSON", extensions: ["json"] }],
       defaultPath: "layout.json",
@@ -58,8 +58,6 @@ export const tauriAPI = {
   },
 
   importLayout: async (): Promise<string | null> => {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const { readTextFile } = await import("@tauri-apps/plugin-fs");
     const path = await open({
       filters: [{ name: "JSON", extensions: ["json"] }],
       multiple: false,
@@ -149,4 +147,24 @@ export const tauriAPI = {
       unsubPromise.then((unsub) => unsub());
     };
   },
+
+  loadWindowState: (): Promise<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null> => invoke("load_window_state"),
+
+  saveWindowState: (state: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): Promise<void> => invoke("save_window_state", { state }),
+
+  setLaunchOnStartup: (enable: boolean): Promise<void> =>
+    invoke("set_launch_on_startup", { enable }),
+
+  getLaunchOnStartup: (): Promise<boolean> =>
+    invoke("get_launch_on_startup"),
 };

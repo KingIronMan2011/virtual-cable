@@ -33,9 +33,9 @@ The current model is 1 input → 1 output. This tracks a richer mixing model:
 - [x] **Inline cable rename** — click the cable name to edit it in place instead of being stuck with "Cable 01"
 - [x] **Drag to reorder cables** — let users arrange cables in whatever order makes sense to them
 - [x] **Minimize to system tray** — keep the app running in the background without a taskbar presence
-- [ ] **Launch on Windows startup** — add/remove a registry entry so cables are restored automatically at boot
+- [x] **Launch on Windows startup** — add/remove a registry entry so cables are restored automatically at boot
 - [x] **Minimize to tray on close** — option to keep routing alive when the window is closed
-- [ ] **Window size / position persistence** — remember where the user left the window
+- [x] **Window size / position persistence** — remember where the user left the window
 
 ---
 
