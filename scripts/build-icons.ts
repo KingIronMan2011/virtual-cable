@@ -7,8 +7,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const SVG = path.resolve(__dirname, "../assets/icon.svg");
-const OUT = path.resolve(__dirname, "../src-tauri/icons");
+const PATH = path.resolve(__dirname, "../src-tauri/icons");
 
 const ICONS = [
   { name: "32x32.png", size: 32 },
@@ -29,7 +28,7 @@ const ICONS = [
 async function buildIcons() {
   await Promise.all(
     ICONS.map(({ name, size }) =>
-      sharp(SVG).resize(size, size).png().toFile(path.join(OUT, name)),
+      sharp(`${PATH}/icon.svg`).resize(size, size).png().toFile(path.join(PATH, name)),
     ),
   );
 
@@ -37,7 +36,7 @@ async function buildIcons() {
 }
 
 async function main() {
-  fs.mkdirSync(OUT, { recursive: true });
+  fs.mkdirSync(PATH, { recursive: true });
 
   await buildIcons();
 }
