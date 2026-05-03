@@ -4,6 +4,7 @@ import TunnelCard from "./TunnelCard";
 
 interface Props {
   tunnels: Tunnel[];
+  togglingIds: Set<string>;
   devices: AudioDevice[];
   audioApps: { pid: number; name: string; exe: string }[];
   onUpdate: (tunnel: Tunnel) => void;
@@ -29,6 +30,7 @@ interface Props {
 
 export default function TunnelList({
   tunnels,
+  togglingIds,
   devices,
   audioApps,
   onUpdate,
@@ -109,6 +111,7 @@ export default function TunnelList({
         >
           <TunnelCard
             tunnel={tunnel}
+            isToggling={togglingIds.has(tunnel.id)}
             devices={devices}
             audioApps={audioApps}
             onUpdate={onUpdate}

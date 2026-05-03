@@ -9,7 +9,6 @@ A running list of potential improvements and features.
 - [x] **Volume / gain control per cable** — slider on each card to attenuate the signal before it hits the output
 - [x] **Mute toggle per cable** — silence a cable without destroying the stream
 - [x] **VU meter** — real-time input level indicator on each card so you can confirm audio is actually flowing
-- [x] **Latency / buffer size setting** — expose PortAudio's `framesPerBuffer` as a user-facing low/medium/high latency option
 - [x] **Sample rate detection & display** — auto-detect and display the negotiated sample rate for each cable; persists to config
 - [x] **Multi-channel support** — currently capped at stereo; allow mono selection for microphones that perform better in mono
 
@@ -52,22 +51,6 @@ The current model is 1 input → 1 output. This tracks a richer mixing model:
 - [x] **Auto-updates via Tauri updater** — use Tauri's built-in updater plugin with custom server for auto-updates
 - [x] **GitHub Actions CI/CD** — automated builds on push, version detection, and release creation
 - [x] **Release signing** — sign updates with Ed25519 key for security verification
-
----
-
-## Audio Filters
-
-Effects applied in the signal chain between input and output, configurable per cable.
-
-- [ ] **Filter chain per cable** — allow adding/removing/reordering multiple filters on a single cable
-- [ ] **Low quality / telephone** — bandpass ~300–3400 Hz + light distortion to simulate a phone call
-- [ ] **Police / walkie-talkie radio** — aggressive bandpass ~800–3000 Hz, heavy compression, AM-style crackle noise, clipping
-- [ ] **AM radio** — narrow bandwidth ~500–5000 Hz, subtle background hiss, mild distortion
-- [ ] **Underwater** — heavy low-pass filter + chorus/flange effect
-- [ ] **Megaphone** — midrange boost, slight distortion, light reverb
-- [ ] **Bitcrusher** — reduce bit depth and/or sample rate to create lo-fi/retro degraded sound
-- [ ] **Noise gate** — cut signal below a configurable volume threshold; useful for suppressing background hum
-- [ ] **Per-filter bypass toggle** — enable/disable individual filters without removing them from the chain
 
 ---
 

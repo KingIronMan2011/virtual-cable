@@ -205,9 +205,6 @@ fn load_settings(app: AppHandle) -> serde_json::Value {
         serde_json::json!({
             "autoUpdate": true,
             "minimizeToTray": false,
-            "expLatency": false,
-            "bufferSize": 512,
-            "expSampleRate": false,
             "hotkeys": {
                 "addCable": "Ctrl+Alt+N",
                 "toggleSettings": "Ctrl+Alt+,"

@@ -30,9 +30,6 @@ const SETTINGS_DEFAULTS: AppSettings = {
   autoUpdate: false,
   minimizeToTray: false,
   launchOnStartup: false,
-  experimentalFeatures: false,
-  expLatency: false,
-  bufferSize: 512,
   hotkeys: {
     addCable: "Ctrl+Alt+N",
     toggleSettings: "Ctrl+Alt+,",
@@ -54,6 +51,7 @@ export default function App() {
   const [installPct, setInstallPct] = useState(0);
   const [installError, setInstallError] = useState("");
   const loaded = useRef(false);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   // Per-tunnel serial queue — each call chains off the previous so IPC messages
   // for the same tunnel always arrive in the order the user triggered them.
   const updateQueues = useRef(new Map<string, Promise<void>>());
@@ -260,6 +258,10 @@ export default function App() {
   // the state committed by all previously-resolved queue operations.
   const toggleTunnelActive = useCallback(
     (id: string) => {
+      if (togglingIds.has(id)) return;
+
+      setTogglingIds((prev) => new Set(prev).add(id));
+
       enqueue(id, async () => {
         const current = tunnelsRef.current.find((t) => t.id === id);
         if (!current) return;
@@ -299,9 +301,17 @@ export default function App() {
         } else {
           await tauriAPI.destroyTunnel(next.id);
         }
+
+        // Small delay to prevent spamming
+        await new Promise((r) => setTimeout(r, 500));
+        setTogglingIds((prev) => {
+          const nextSet = new Set(prev);
+          nextSet.delete(id);
+          return nextSet;
+        });
       });
     },
-    [enqueue, isHotkeyMatch],
+    [enqueue, isHotkeyMatch, togglingIds],
   );
 
   // Global keyboard shortcuts
@@ -740,6 +750,7 @@ export default function App() {
         <div className="cables-container">
           <TunnelList
             tunnels={tunnels}
+            togglingIds={togglingIds}
             devices={devices}
             audioApps={audioApps}
             onUpdate={updateTunnel}

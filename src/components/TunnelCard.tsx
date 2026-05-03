@@ -15,6 +15,7 @@ import HotkeyInput from "./HotkeyInput";
 
 interface Props {
   tunnel: Tunnel;
+  isToggling: boolean;
   devices: AudioDevice[];
   audioApps: { pid: number; name: string; exe: string }[];
   onUpdate: (tunnel: Tunnel) => void;
@@ -44,6 +45,7 @@ function dbLabel(gain: number, decimals = 1) {
 
 export default function TunnelCard({
   tunnel,
+  isToggling,
   devices,
   audioApps,
   onUpdate,
@@ -231,7 +233,7 @@ export default function TunnelCard({
 
         if (e.key === " " || e.key === "Enter") {
           e.preventDefault();
-          if (canActivate) onToggleActive(tunnel.id);
+          if (canActivate && !isToggling) onToggleActive(tunnel.id);
         }
 
         if (e.key.toLowerCase() === "m") {
@@ -639,8 +641,14 @@ export default function TunnelCard({
         <button
           className={`cable-toggle${tunnel.active ? " is-active" : ""}`}
           onClick={() => onToggleActive(tunnel.id)}
-          disabled={!canActivate}
-          title={!canActivate ? "Select input and output first" : undefined}
+          disabled={!canActivate || isToggling}
+          title={
+            !canActivate
+              ? "Select input and output first"
+              : isToggling
+                ? "Cooling down..."
+                : undefined
+          }
         >
           <Power size={12} strokeWidth={2.5} />
           {tunnel.active ? "Live" : "Offline"}
