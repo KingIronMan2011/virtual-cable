@@ -96,7 +96,7 @@ fn create_tunnel(
     output_id: i32,
     channel_count: Option<i32>,
     ducking: DuckingConfig,
-) {
+) -> Result<(), String> {
     let inputs = inputs.into_iter().map(|i| audio::tunnel::TunnelInputConfig {
         device_id: i.deviceId,
         app_pid: i.appPid.unwrap_or(0),
@@ -118,11 +118,13 @@ fn create_tunnel(
         channel_count.unwrap_or(2) as u32,
         ducking_cfg,
     );
+    Ok(())
 }
 
 #[tauri::command]
-fn destroy_tunnel(id: String) {
+fn destroy_tunnel(id: String) -> Result<(), String> {
     audio::engine::destroy_tunnel(&id);
+    Ok(())
 }
 
 #[tauri::command]
@@ -164,93 +166,6 @@ fn get_tunnel_channel_count(id: String) -> i32 {
     audio::engine::get_tunnel_channel_count(&id)
 }
 
-// --- Storage ---
-
-use std::fs;
-use std::path::PathBuf;
-
-fn get_data_dir(app: &AppHandle) -> PathBuf {
-    let path = app.path().app_data_dir().unwrap();
-    if !path.exists() {
-        fs::create_dir_all(&path).unwrap();
-    }
-    path
-}
-
-#[tauri::command]
-fn load_tunnels(app: AppHandle) -> serde_json::Value {
-    let path = get_data_dir(&app).join("tunnels.json");
-    if path.exists() {
-        let content = fs::read_to_string(path).unwrap_or_else(|_| "[]".to_string());
-        serde_json::from_str(&content).unwrap_or(serde_json::json!([]))
-    } else {
-        serde_json::json!([])
-    }
-}
-
-#[tauri::command]
-fn save_tunnels(app: AppHandle, tunnels: serde_json::Value) {
-    let path = get_data_dir(&app).join("tunnels.json");
-    let content = serde_json::to_string_pretty(&tunnels).unwrap();
-    let _ = fs::write(path, content);
-}
-
-#[tauri::command]
-fn load_settings(app: AppHandle) -> serde_json::Value {
-    let path = get_data_dir(&app).join("settings.json");
-    if path.exists() {
-        let content = fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
-        serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
-    } else {
-        serde_json::json!({
-            "autoUpdate": true,
-            "minimizeToTray": false,
-            "hotkeys": {
-                "addCable": "Ctrl+Alt+N",
-                "toggleSettings": "Ctrl+Alt+,"
-            }
-        })
-    }
-}
-
-#[tauri::command]
-fn save_settings(app: AppHandle, settings: serde_json::Value) {
-    let path = get_data_dir(&app).join("settings.json");
-    let content = serde_json::to_string_pretty(&settings).unwrap();
-    let _ = fs::write(path, content);
-}
-
-// --- Window State ---
-
-#[derive(Serialize, Deserialize)]
-struct WindowState {
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
-}
-
-#[tauri::command]
-fn load_window_state(app: AppHandle) -> Option<WindowState> {
-    let path = get_data_dir(&app).join("window.json");
-    if path.exists() {
-        let content = fs::read_to_string(path).ok()?;
-        serde_json::from_str(&content).ok()
-    } else {
-        None
-    }
-}
-
-#[tauri::command]
-fn save_window_state(app: AppHandle, state: WindowState) {
-    let path = get_data_dir(&app).join("window.json");
-    if let Ok(content) = serde_json::to_string_pretty(&state) {
-        let _ = fs::write(path, content);
-    }
-}
-
-// --- Windows Startup (now using system module) ---
-
 #[tauri::command]
 fn set_launch_on_startup(_app: AppHandle, enable: bool) -> Result<(), String> {
     system::set_launch_on_startup(enable)
@@ -269,8 +184,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::CloseRequested { api: _api, .. } = event {
-                // If minimizeToTray is enabled, we hide the window instead of closing it
-                // We'll check the setting here. For now, let's just always stop tunnels.
                 audio::engine::destroy_all_tunnels();
             }
         })
@@ -278,7 +191,6 @@ pub fn run() {
             use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState};
             use tauri::menu::{Menu, MenuItem};
 
-            // Setup Tray Icon
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
@@ -333,12 +245,12 @@ pub fn run() {
             set_tunnel_ducking,
             get_tunnel_sample_rate,
             get_tunnel_channel_count,
-            load_tunnels,
-            save_tunnels,
-            load_settings,
-            save_settings,
-            load_window_state,
-            save_window_state,
+            storage::commands::load_tunnels,
+            storage::commands::save_tunnels,
+            storage::commands::load_settings,
+            storage::commands::save_settings,
+            storage::commands::load_window_state,
+            storage::commands::save_window_state,
             set_launch_on_startup,
             get_launch_on_startup,
         ])

@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import {
   AlertCircle,
@@ -25,6 +24,9 @@ import TunnelList from "./components/TunnelList";
 import VBInstallModal from "./components/VBInstallModal";
 import SettingsPanel from "./components/SettingsPanel";
 import { tauriAPI } from "./tauriAPI";
+import { useTunnels } from "./hooks/useTunnels";
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useWindowState } from "./hooks/useWindowState";
 
 const SETTINGS_DEFAULTS: AppSettings = {
   autoUpdate: false,
@@ -41,7 +43,6 @@ export default function App() {
   const [audioApps, setAudioApps] = useState<
     { pid: number; name: string; exe: string }[]
   >([]);
-  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [settings, setSettings] = useState<AppSettings>(SETTINGS_DEFAULTS);
   const [vbInstalled, setVbInstalled] = useState<boolean | null>(null);
   const [vbModalOpen, setVbModalOpen] = useState(false);
@@ -50,18 +51,35 @@ export default function App() {
   const [installState, setInstallState] = useState<InstallState>("idle");
   const [installPct, setInstallPct] = useState(0);
   const [installError, setInstallError] = useState("");
-  const loaded = useRef(false);
-  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
-  // Per-tunnel serial queue — each call chains off the previous so IPC messages
-  // for the same tunnel always arrive in the order the user triggered them.
-  const updateQueues = useRef(new Map<string, Promise<void>>());
-  // Mirror of `tunnels` state, updated synchronously on every render.
-  // Queue operations read from this ref at execution time (after all prior async
-  // IPC calls resolve and React has re-rendered), so they always see fresh state.
-  const tunnelsRef = useRef<Tunnel[]>([]);
-  tunnelsRef.current = tunnels;
-  const settingsRef = useRef<AppSettings>(settings);
-  settingsRef.current = settings;
+  const [isLoaded, setIsLoaded] = useState(false);
+  const {
+    tunnels,
+    setTunnels,
+    tunnelsRef,
+    togglingIds,
+    addTunnel,
+    deleteTunnel,
+    updateTunnel,
+    toggleTunnelActive,
+    toggleTunnelMute,
+    setTunnelGain,
+    setTunnelInputGain,
+    setTunnelInputPriority,
+    setTunnelDucking,
+    renameTunnel,
+    reorderTunnels,
+  } = useTunnels(isLoaded);
+
+  useWindowState(isLoaded);
+
+  useGlobalShortcuts(
+    isLoaded,
+    settings,
+    tunnels,
+    addTunnel,
+    setSettingsOpen,
+    toggleTunnelActive,
+  );
 
   useEffect(() => {
     Promise.all([
@@ -74,7 +92,6 @@ export default function App() {
     ]).then(([devs, saved, installed, s, apps, windowState]) => {
       setDevices(devs);
       setAudioApps(apps);
-      // Ensure tunnels start in an inactive state upon app launch
       setTunnels(
         saved.map((t, index) => ({
           ...t,
@@ -98,71 +115,18 @@ export default function App() {
         },
       }));
 
-      // Restore window state if it exists
       if (windowState) {
-        (async () => {
-          const appWindow = WebviewWindow.getCurrent();
-          await appWindow.setPosition(
-            new LogicalPosition(windowState.x, windowState.y),
-          );
-          await appWindow.setSize(
-            new LogicalSize(windowState.width, windowState.height),
-          );
-        })();
+        const appWindow = WebviewWindow.getCurrent();
+        appWindow.setPosition(
+          new LogicalPosition(windowState.x, windowState.y),
+        );
+        appWindow.setSize(
+          new LogicalSize(windowState.width, windowState.height),
+        );
       }
 
-      loaded.current = true;
+      setIsLoaded(true);
     });
-  }, []);
-
-  useEffect(() => {
-    if (!loaded.current) return;
-    // Always save tunnels as inactive so they don't auto-start on next launch
-    const toSave = tunnels.map((t) => ({ ...t, active: false, muted: false }));
-    tauriAPI.saveTunnels(toSave);
-  }, [tunnels]);
-
-  // Listen for window move/resize and save state
-  useEffect(() => {
-    if (!loaded.current) return;
-
-    (async () => {
-      const appWindow = WebviewWindow.getCurrent();
-
-      // Save window state on move or resize
-      const saveWindowState = async () => {
-        const pos = await appWindow.outerPosition();
-        const size = await appWindow.outerSize();
-        await tauriAPI.saveWindowState({
-          x: Math.round(pos.x),
-          y: Math.round(pos.y),
-          width: Math.round(size.width),
-          height: Math.round(size.height),
-        });
-      };
-
-      // Debounce the save to avoid too frequent writes
-      let saveTimer: ReturnType<typeof setTimeout> | null = null;
-      const debouncedSave = () => {
-        if (saveTimer) clearTimeout(saveTimer);
-        saveTimer = setTimeout(saveWindowState, 500);
-      };
-
-      // Listen for move and resize events
-      const unlistenMove = await appWindow.onMoved(debouncedSave);
-      const unlistenResize = await appWindow.onResized(debouncedSave);
-
-      // Save on window close
-      const unlistenCloseRequested =
-        await appWindow.onCloseRequested(saveWindowState);
-
-      return () => {
-        unlistenMove();
-        unlistenResize();
-        unlistenCloseRequested();
-        if (saveTimer) clearTimeout(saveTimer);
-      };
-    })();
   }, []);
 
   // Poll for newly started audio apps every 3 s so the user doesn't need to restart.
@@ -181,281 +145,6 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const addTunnel = useCallback(() => {
-    setTunnels((prev) => {
-      const n = prev.length + 1;
-      return [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          name: `Cable ${String(n).padStart(2, "0")}`,
-          inputs: [{ deviceId: null, appPid: null, gain: 1, priority: false }],
-          outputDeviceId: null,
-          active: false,
-          muted: false,
-          channelCount: null,
-          gain: 1,
-          duckingEnabled: false,
-          duckingAmount: 0.15,
-          duckingRelease: 1000,
-          hotkey: n <= 9 ? `Ctrl+Alt+Numpad${n}` : null,
-        },
-      ];
-    });
-  }, []);
-
-  const isHotkeyMatch = useCallback(
-    (e: KeyboardEvent, hotkeyStr: string | null) => {
-      if (!hotkeyStr) return false;
-      const parts = hotkeyStr.split("+").map((p) => p.trim().toLowerCase());
-      const key = parts.pop();
-      if (!key) return false;
-
-      // Handle special keys
-      const eventKey = e.key.toLowerCase();
-      if (eventKey !== key && e.code.toLowerCase() !== key) return false;
-
-      const ctrl = parts.includes("ctrl");
-      const shift = parts.includes("shift");
-      const alt = parts.includes("alt");
-      const meta = parts.includes("meta");
-
-      return (
-        e.ctrlKey === ctrl &&
-        e.shiftKey === shift &&
-        e.altKey === alt &&
-        e.metaKey === meta
-      );
-    },
-    [],
-  );
-
-  const deleteTunnel = useCallback(async (id: string) => {
-    await tauriAPI.destroyTunnel(id);
-    setTunnels((prev) => prev.filter((t) => t.id !== id));
-    updateQueues.current.delete(id);
-  }, []);
-
-  // Enqueue an async operation for a tunnel onto its serial queue.
-  // One failure swallows so it doesn't stall subsequent operations.
-  const enqueue = useCallback((id: string, op: () => Promise<void>) => {
-    const tail = (updateQueues.current.get(id) ?? Promise.resolve()).then(op);
-    updateQueues.current.set(id, tail.catch(console.error));
-  }, []);
-
-  // Device-change: always deactivates the tunnel, no IPC needed beyond destroy.
-  const updateTunnel = useCallback(
-    (updated: Tunnel) => {
-      enqueue(updated.id, async () => {
-        setTunnels((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
-        await tauriAPI.destroyTunnel(updated.id);
-      });
-    },
-    [enqueue],
-  );
-
-  // Toggle active — reads from tunnelsRef at execution time so it always sees
-  // the state committed by all previously-resolved queue operations.
-  const toggleTunnelActive = useCallback(
-    (id: string) => {
-      if (togglingIds.has(id)) return;
-
-      setTogglingIds((prev) => new Set(prev).add(id));
-
-      enqueue(id, async () => {
-        const current = tunnelsRef.current.find((t) => t.id === id);
-        if (!current) return;
-        const next: Tunnel = {
-          ...current,
-          active: !current.active,
-          // clear mute when going offline so it doesn't persist into next session
-          muted: current.active ? false : current.muted,
-        };
-        setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
-        // An input is "ready" if it has either a device or an app selected.
-        const readyInputs = next.inputs.filter(
-          (inp) => inp.deviceId !== null || inp.appPid !== null,
-        );
-        if (
-          next.active &&
-          readyInputs.length > 0 &&
-          next.outputDeviceId !== null
-        ) {
-          await tauriAPI.createTunnel(
-            next.id,
-            readyInputs.map((inp) => ({
-              deviceId: inp.deviceId ?? 0,
-              appPid: inp.appPid ?? undefined,
-              gain: inp.gain,
-              priority: inp.priority,
-            })),
-            next.outputDeviceId,
-            next.channelCount,
-            {
-              enabled: next.duckingEnabled,
-              amount: next.duckingAmount,
-              release: next.duckingRelease,
-            },
-          );
-          await tauriAPI.setTunnelMuted(next.id, next.muted);
-        } else {
-          await tauriAPI.destroyTunnel(next.id);
-        }
-
-        // Small delay to prevent spamming
-        await new Promise((r) => setTimeout(r, 500));
-        setTogglingIds((prev) => {
-          const nextSet = new Set(prev);
-          nextSet.delete(id);
-          return nextSet;
-        });
-      });
-    },
-    [enqueue, isHotkeyMatch, togglingIds],
-  );
-
-  // Global keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape: Close Settings (always active)
-      if (e.key === "Escape") {
-        setSettingsOpen(false);
-        return;
-      }
-
-      // Check global configurable hotkeys
-      const s = settingsRef.current;
-      if (isHotkeyMatch(e, s.hotkeys.addCable)) {
-        e.preventDefault();
-        addTunnel();
-        return;
-      }
-      if (isHotkeyMatch(e, s.hotkeys.toggleSettings)) {
-        e.preventDefault();
-        setSettingsOpen((prev) => !prev);
-        return;
-      }
-
-      // Check tunnel-specific hotkeys
-      for (const t of tunnelsRef.current) {
-        if (isHotkeyMatch(e, t.hotkey)) {
-          e.preventDefault();
-          toggleTunnelActive(t.id);
-          return;
-        }
-      }
-
-      // Escape: Close Settings (hardcoded fallback)
-      if (e.key === "Escape") {
-        setSettingsOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [addTunnel, settingsOpen, isHotkeyMatch, toggleTunnelActive]);
-
-  // Toggle mute — reads from tunnelsRef at execution time.
-  const toggleTunnelMute = useCallback(
-    (id: string) => {
-      enqueue(id, async () => {
-        const current = tunnelsRef.current.find((t) => t.id === id);
-        if (!current?.active) return;
-        const next: Tunnel = { ...current, muted: !current.muted };
-        setTunnels((ts) => ts.map((t) => (t.id === id ? next : t)));
-        await tauriAPI.setTunnelMuted(next.id, next.muted);
-      });
-    },
-    [enqueue],
-  );
-
-  // Set master gain — live update, no tunnel restart needed.
-  const setTunnelGain = useCallback((id: string, gain: number) => {
-    setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, gain } : t)));
-    const current = tunnelsRef.current.find((t) => t.id === id);
-    if (current?.active) tauriAPI.setTunnelGain(id, gain);
-  }, []);
-
-  // Set per-input gain — live update, no tunnel restart needed.
-  const setTunnelInputGain = useCallback(
-    (id: string, inputIndex: number, gain: number) => {
-      setTunnels((ts) =>
-        ts.map((t) => {
-          if (t.id !== id) return t;
-          const inputs = t.inputs.map((inp, i) =>
-            i === inputIndex ? { ...inp, gain } : inp,
-          );
-          return { ...t, inputs };
-        }),
-      );
-      const current = tunnelsRef.current.find((t) => t.id === id);
-      if (current?.active) tauriAPI.setTunnelInputGain(id, inputIndex, gain);
-    },
-    [],
-  );
-
-  // Set input priority — live update, no tunnel restart needed.
-  const setTunnelInputPriority = useCallback(
-    (id: string, inputIndex: number, priority: boolean) => {
-      setTunnels((ts) =>
-        ts.map((t) => {
-          if (t.id !== id) return t;
-          const inputs = t.inputs.map((inp, i) =>
-            i === inputIndex ? { ...inp, priority } : inp,
-          );
-          return { ...t, inputs };
-        }),
-      );
-      const current = tunnelsRef.current.find((t) => t.id === id);
-      if (current?.active)
-        tauriAPI.setTunnelInputPriority(id, inputIndex, priority);
-    },
-    [],
-  );
-
-  // Set ducking config — live update, no tunnel restart needed.
-  const setTunnelDucking = useCallback(
-    (
-      id: string,
-      duckingEnabled: boolean,
-      duckingAmount: number,
-      duckingRelease: number,
-    ) => {
-      setTunnels((ts) =>
-        ts.map((t) =>
-          t.id !== id
-            ? t
-            : { ...t, duckingEnabled, duckingAmount, duckingRelease },
-        ),
-      );
-      const current = tunnelsRef.current.find((t) => t.id === id);
-      if (current?.active) {
-        tauriAPI.setTunnelDucking(id, {
-          enabled: duckingEnabled,
-          amount: duckingAmount,
-          release: duckingRelease,
-        });
-      }
-    },
-    [],
-  );
-
-  // Rename — only touches the name, never restarts the stream.
-  const renameTunnel = useCallback((id: string, name: string) => {
-    setTunnels((ts) => ts.map((t) => (t.id === id ? { ...t, name } : t)));
-  }, []);
-
-  // Reorder via drag-and-drop.
-  const reorderTunnels = useCallback((from: number, to: number) => {
-    if (from === to) return;
-    setTunnels((prev) => {
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
-  }, []);
-
   // Export current layout to a user-chosen JSON file.
   const exportLayout = useCallback(async () => {
     const snapshot = tunnelsRef.current.map((t) => ({
@@ -464,7 +153,7 @@ export default function App() {
       muted: false,
     }));
     await tauriAPI.exportLayout(JSON.stringify(snapshot, null, 2));
-  }, []);
+  }, [tunnelsRef]);
 
   // Import layout from a JSON file — replaces all cables, stops active ones first.
   const importLayout = useCallback(async () => {
@@ -537,7 +226,7 @@ export default function App() {
     } catch {
       // Silently ignore malformed files
     }
-  }, []);
+  }, [setTunnels, tunnelsRef]);
 
   const handleDownloadInstall = useCallback(async () => {
     setInstallState("downloading");
@@ -564,7 +253,6 @@ export default function App() {
     }
   }, []);
 
-  // Fallback: open browser page if direct download fails
   const handleOpenPage = useCallback(async () => {
     await tauriAPI.installVBAudio();
     setVbModalOpen(false);
@@ -582,8 +270,6 @@ export default function App() {
     if (installed) setVbToastDismissed(false);
   }, []);
 
-  // Auto-rescan when the window regains focus so newly installed
-  // VB-Audio devices appear without a manual rescan or restart
   useEffect(() => {
     window.addEventListener("focus", rescanDevices);
     return () => window.removeEventListener("focus", rescanDevices);
@@ -594,86 +280,6 @@ export default function App() {
   const showToast =
     vbInstalled === false && !vbToastDismissed && installState === "idle";
   const showProgress = installState !== "idle" && installState !== "done";
-
-  // Sync global shortcuts with the OS
-  useEffect(() => {
-    if (!loaded.current) return;
-
-    let active = true;
-    const syncShortcuts = async () => {
-      console.log("Syncing global shortcuts...");
-      try {
-        await unregisterAll();
-        if (!active) return;
-
-        const toRegister: { key: string; action: () => void }[] = [];
-
-        // Global settings hotkeys
-        const normalize = (h: string) =>
-          h
-            .replace(/Ctrl/g, "Control")
-            .replace(/\+,$/, "+Comma")
-            .replace(/\+\.$/, "+Period")
-            .replace(/\+\/$/, "+Slash")
-            .replace(/\+\\$/, "+Backslash")
-            .replace(/\+-$/, "+Minus")
-            .replace(/\+=$/, "+Equal");
-
-        if (settings.hotkeys.addCable) {
-          toRegister.push({
-            key: normalize(settings.hotkeys.addCable),
-            action: addTunnel,
-          });
-        }
-        if (settings.hotkeys.toggleSettings) {
-          toRegister.push({
-            key: normalize(settings.hotkeys.toggleSettings),
-            action: () => setSettingsOpen((prev) => !prev),
-          });
-        }
-
-        // Tunnel-specific hotkeys
-        for (const t of tunnels) {
-          if (t.hotkey) {
-            toRegister.push({
-              key: normalize(t.hotkey),
-              action: () => toggleTunnelActive(t.id),
-            });
-          }
-        }
-
-        for (const { key, action } of toRegister) {
-          try {
-            console.log(`Registering global shortcut: ${key}`);
-            await register(key, (event) => {
-              if (event.state === "Pressed") {
-                console.log(`Global shortcut triggered: ${key}`);
-                action();
-              }
-            });
-          } catch (err) {
-            console.error(`Failed to register global shortcut ${key}:`, err);
-          }
-        }
-        console.log("Global shortcuts sync complete.");
-      } catch (err) {
-        console.error("Failed to sync global shortcuts:", err);
-      }
-    };
-
-    syncShortcuts();
-    return () => {
-      active = false;
-      unregisterAll();
-    };
-  }, [
-    loaded,
-    settings.hotkeys,
-    // Only re-sync if tunnel IDs or their hotkeys change
-    JSON.stringify(tunnels.map((t) => ({ id: t.id, hotkey: t.hotkey }))),
-    addTunnel,
-    toggleTunnelActive,
-  ]);
 
   const progressLabel: Record<InstallState, string> = {
     idle: "",

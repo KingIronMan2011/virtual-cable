@@ -11,6 +11,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+pub mod commands;
+
 // ===== Configuration Types =====
 
 /// Audio tunnel configuration

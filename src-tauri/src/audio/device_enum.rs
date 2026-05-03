@@ -31,6 +31,33 @@ pub fn is_valid_device_name(name: &str) -> bool {
     !name.is_empty() && name.len() > 2
 }
 
+pub fn get_cpal_device_by_id(id: i32) -> Option<cpal::Device> {
+    let host = cpal::default_host();
+    let mut id_counter = 0;
+    if let Ok(device_iter) = host.devices() {
+        for device in device_iter {
+            if let Ok(name) = device.name() {
+                if !is_valid_device_name(&name) {
+                    continue;
+                }
+
+                let has_input = device.supported_input_configs().map(|mut c| c.next().is_some()).unwrap_or(false);
+                let has_output = device.supported_output_configs().map(|mut c| c.next().is_some()).unwrap_or(false);
+
+                if !has_input && !has_output {
+                    continue;
+                }
+
+                if id_counter == id {
+                    return Some(device);
+                }
+                id_counter += 1;
+            }
+        }
+    }
+    None
+}
+
 pub fn get_audio_devices() -> Vec<AudioDevice> {
     let mut devices = Vec::new();
     let host = cpal::default_host();

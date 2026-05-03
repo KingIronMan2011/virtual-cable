@@ -43,7 +43,8 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
     };
 
     let mut apps = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen_pids = HashSet::new();
+    let mut seen_exes = HashSet::new();
 
     let com_initialized = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() };
 
@@ -64,7 +65,7 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
             };
 
             let pid = unsafe { session2.GetProcessId()? };
-            if pid == 0 || !seen.insert(pid) {
+            if pid == 0 || !seen_pids.insert(pid) {
                 continue;
             }
 
@@ -95,6 +96,11 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
                 .next()
                 .unwrap_or(&full_path)
                 .to_string();
+
+            // Deduplicate by executable name (case-insensitive)
+            if !seen_exes.insert(exe.to_lowercase()) {
+                continue;
+            }
 
             let name = exe
                 .strip_suffix(".exe")
