@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import {
@@ -115,14 +115,31 @@ export default function App() {
         },
       }));
 
+      const appWindow = WebviewWindow.getCurrent();
       if (windowState) {
-        const appWindow = WebviewWindow.getCurrent();
-        appWindow.setPosition(
-          new LogicalPosition(windowState.x, windowState.y),
-        );
+        // Basic sanity check: if coordinates are extreme, center instead.
+        // Windows 'minimized' coordinates can be around -32000.
+        const isOffscreen =
+          Math.abs(windowState.x) > 10000 ||
+          Math.abs(windowState.y) > 10000 ||
+          windowState.width < 100 ||
+          windowState.height < 100;
+
+        if (isOffscreen) {
+          appWindow.center();
+        } else {
+          appWindow.setPosition(
+            new LogicalPosition(windowState.x, windowState.y),
+          );
+        }
         appWindow.setSize(
-          new LogicalSize(windowState.width, windowState.height),
+          new LogicalSize(
+            Math.max(windowState.width, 400),
+            Math.max(windowState.height, 300),
+          ),
         );
+      } else {
+        appWindow.center();
       }
 
       setIsLoaded(true);

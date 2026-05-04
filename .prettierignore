@@ -36,3 +36,6 @@ package-lock.json
 # Generated/compiled files
 **/*.js.map
 **/*.d.ts.map
+
+# Release files
+website/public/releases
