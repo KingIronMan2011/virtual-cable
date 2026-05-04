@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
+import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import {
   AlertCircle,
   CheckCircle2,
@@ -129,13 +129,13 @@ export default function App() {
           appWindow.center();
         } else {
           appWindow.setPosition(
-            new LogicalPosition(windowState.x, windowState.y),
+            new PhysicalPosition(windowState.x, windowState.y),
           );
         }
         appWindow.setSize(
-          new LogicalSize(
-            Math.max(windowState.width, 400),
-            Math.max(windowState.height, 300),
+          new PhysicalSize(
+            Math.max(windowState.width, 600),
+            Math.max(windowState.height, 400),
           ),
         );
       } else {

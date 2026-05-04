@@ -179,6 +179,7 @@ fn get_launch_on_startup() -> Result<bool, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -189,9 +190,20 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .on_window_event(|_window, event| {
-            if let tauri::WindowEvent::CloseRequested { api: _api, .. } = event {
-                audio::engine::destroy_all_tunnels();
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle();
+                let settings = storage::commands::load_settings(app.clone());
+                let minimize_to_tray = settings.get("minimizeToTray")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                if minimize_to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                } else {
+                    audio::engine::destroy_all_tunnels();
+                }
             }
         })
         .setup(|app| {
