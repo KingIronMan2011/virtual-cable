@@ -1,21 +1,27 @@
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use once_cell::sync::Lazy;
 
-use crate::audio::tunnel::{build_tunnel, DuckingConfig, TunnelInputConfig, TunnelState, store_f32};
+use crate::audio::tunnel::{
+    build_tunnel, store_f32, DuckingConfig, TunnelInputConfig, TunnelState,
+};
 
-static TUNNELS: Lazy<Mutex<HashMap<String, TunnelState>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static LEVEL_CALLBACK: Lazy<Arc<Mutex<Option<Box<dyn Fn(String, f32) + Send + Sync>>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
+type LevelCallback = Box<dyn Fn(String, f32) + Send + Sync>;
+type SharedLevelCallback = Arc<Mutex<Option<LevelCallback>>>;
+
+static TUNNELS: Lazy<Mutex<HashMap<String, TunnelState>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static LEVEL_CALLBACK: Lazy<SharedLevelCallback> = Lazy::new(|| Arc::new(Mutex::new(None)));
 static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn initialize() {
     RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
-    
+
     // Spawn a thread to monitor levels
     std::thread::spawn(|| {
         while RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
             std::thread::sleep(std::time::Duration::from_millis(50)); // ~20fps
-            
+
             {
                 let cb_lock = LEVEL_CALLBACK.lock().unwrap();
                 if let Some(cb) = cb_lock.as_ref() {
@@ -49,8 +55,15 @@ pub fn create_tunnel(
     ducking: DuckingConfig,
 ) {
     destroy_tunnel(&id);
-    
-    match build_tunnel(id.clone(), inputs, output_device_id, frames_per_buffer, requested_channels, ducking) {
+
+    match build_tunnel(
+        id.clone(),
+        inputs,
+        output_device_id,
+        frames_per_buffer,
+        requested_channels,
+        ducking,
+    ) {
         Ok(tunnel) => {
             let mut map = TUNNELS.lock().unwrap();
             map.insert(id, tunnel);
@@ -82,7 +95,9 @@ pub fn destroy_all_tunnels() {
 pub fn set_tunnel_muted(id: &str, muted: bool) {
     let map = TUNNELS.lock().unwrap();
     if let Some(tunnel) = map.get(id) {
-        tunnel.muted.store(muted, std::sync::atomic::Ordering::Relaxed);
+        tunnel
+            .muted
+            .store(muted, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -114,7 +129,9 @@ pub fn set_tunnel_input_priority(id: &str, input_index: i32, priority: bool) {
 pub fn set_tunnel_ducking(id: &str, ducking: DuckingConfig) {
     let map = TUNNELS.lock().unwrap();
     if let Some(tunnel) = map.get(id) {
-        tunnel.ducking_enabled.store(ducking.enabled, std::sync::atomic::Ordering::Relaxed);
+        tunnel
+            .ducking_enabled
+            .store(ducking.enabled, std::sync::atomic::Ordering::Relaxed);
         store_f32(&tunnel.ducking_amount, ducking.amount);
         store_f32(&tunnel.ducking_release, ducking.release);
     }

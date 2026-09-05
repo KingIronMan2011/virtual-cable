@@ -5,7 +5,6 @@
 ///
 /// RMS is a good audio loudness metric: it represents the average power of the signal.
 /// For int16 PCM audio, RMS is normalized to 0.0-1.0 range where 1.0 = full scale (32767).
-
 use std::sync::Arc;
 
 // ===== Metering Types =====
@@ -32,6 +31,8 @@ pub type MeteringCallbackRef = Arc<dyn MeteringCallback>;
 ///
 /// # Example
 /// ```
+/// use app_lib::audio::metering::calculate_rms;
+///
 /// let samples = vec![32767, -32767, 0, 16384];
 /// let rms = calculate_rms(&samples);
 /// assert!(rms > 0.0 && rms <= 1.0);
@@ -65,6 +66,10 @@ pub fn calculate_rms(samples: &[i16]) -> f32 {
 ///
 /// # Example
 /// ```
+/// use app_lib::audio::metering::calculate_rms_smoothed;
+///
+/// let samples1 = vec![0, 16_384];
+/// let samples2 = vec![16_384, 32_767];
 /// let rms1 = calculate_rms_smoothed(&samples1, 0.0, 0.3);
 /// let rms2 = calculate_rms_smoothed(&samples2, rms1, 0.3);
 /// // rms2 will be less jerky than pure RMS

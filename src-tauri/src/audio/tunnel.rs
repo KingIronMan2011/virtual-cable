@@ -50,8 +50,10 @@ pub fn load_f32(atomic: &AtomicU32) -> f32 {
     f32::from_bits(atomic.load(Ordering::Relaxed))
 }
 
+type SampleReader = Box<dyn FnMut(&mut [f32]) -> usize + Send>;
+
 pub struct MixerInput {
-    pub pop_slice: Box<dyn FnMut(&mut [f32]) -> usize + Send>,
+    pub pop_slice: SampleReader,
     pub gain: Arc<AtomicU32>,
     pub priority: Arc<AtomicBool>,
 }
@@ -140,7 +142,7 @@ pub fn build_tunnel(
         } else if let Some(in_device) =
             crate::audio::device_enum::get_cpal_device_by_id(input_cfg.device_id)
         {
-            let mut in_cfg = config.clone();
+            let mut in_cfg = config;
             if let Ok(supported_configs) = in_device.supported_input_configs() {
                 let mut found_supported = false;
                 for supported in supported_configs {
@@ -302,8 +304,8 @@ pub fn build_tunnel(
                         g *= current_duck_gain;
                     }
 
-                    for i in 0..data.len() {
-                        data[i] += scratch_buffers[idx][i] * g;
+                    for (sample, input_sample) in data.iter_mut().zip(&scratch_buffers[idx]) {
+                        *sample += input_sample * g;
                     }
                 }
 
