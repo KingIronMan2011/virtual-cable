@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::audio::tunnel::{
     build_tunnel, store_f32, DuckingConfig, TunnelInputConfig, TunnelState,
@@ -23,9 +24,9 @@ pub fn initialize() {
             std::thread::sleep(std::time::Duration::from_millis(50)); // ~20fps
 
             {
-                let cb_lock = LEVEL_CALLBACK.lock().unwrap();
+                let cb_lock = LEVEL_CALLBACK.lock();
                 if let Some(cb) = cb_lock.as_ref() {
-                    let tunnels = TUNNELS.lock().unwrap();
+                    let tunnels = TUNNELS.lock();
                     for (id, state) in tunnels.iter() {
                         let level = crate::audio::tunnel::load_f32(&state.current_level);
                         cb(id.clone(), level);
@@ -42,7 +43,7 @@ pub fn terminate() {
 }
 
 pub fn set_level_callback(cb: impl Fn(String, f32) + Send + Sync + 'static) {
-    let mut cb_lock = LEVEL_CALLBACK.lock().unwrap();
+    let mut cb_lock = LEVEL_CALLBACK.lock();
     *cb_lock = Some(Box::new(cb));
 }
 
@@ -65,7 +66,7 @@ pub fn create_tunnel(
         ducking,
     ) {
         Ok(tunnel) => {
-            let mut map = TUNNELS.lock().unwrap();
+            let mut map = TUNNELS.lock();
             map.insert(id, tunnel);
         }
         Err(e) => {
@@ -75,7 +76,7 @@ pub fn create_tunnel(
 }
 
 pub fn destroy_tunnel(id: &str) {
-    let mut map = TUNNELS.lock().unwrap();
+    let mut map = TUNNELS.lock();
     if let Some(mut tunnel) = map.remove(id) {
         for app in tunnel.app_captures.iter_mut() {
             app.stop();
@@ -84,7 +85,7 @@ pub fn destroy_tunnel(id: &str) {
 }
 
 pub fn destroy_all_tunnels() {
-    let mut map = TUNNELS.lock().unwrap();
+    let mut map = TUNNELS.lock();
     for (_, mut tunnel) in map.drain() {
         for app in tunnel.app_captures.iter_mut() {
             app.stop();
@@ -93,7 +94,7 @@ pub fn destroy_all_tunnels() {
 }
 
 pub fn set_tunnel_muted(id: &str, muted: bool) {
-    let map = TUNNELS.lock().unwrap();
+    let map = TUNNELS.lock();
     if let Some(tunnel) = map.get(id) {
         tunnel
             .muted
@@ -102,14 +103,14 @@ pub fn set_tunnel_muted(id: &str, muted: bool) {
 }
 
 pub fn set_tunnel_gain(id: &str, gain: f32) {
-    let map = TUNNELS.lock().unwrap();
+    let map = TUNNELS.lock();
     if let Some(tunnel) = map.get(id) {
         store_f32(&tunnel.master_gain, gain);
     }
 }
 
 pub fn set_tunnel_input_gain(id: &str, input_index: i32, gain: f32) {
-    let map = TUNNELS.lock().unwrap();
+    let map = TUNNELS.lock();
     if let Some(tunnel) = map.get(id) {
         if let Some(g) = tunnel.input_gains.get(input_index as usize) {
             store_f32(g, gain);
@@ -118,7 +119,7 @@ pub fn set_tunnel_input_gain(id: &str, input_index: i32, gain: f32) {
 }
 
 pub fn set_tunnel_input_priority(id: &str, input_index: i32, priority: bool) {
-    let map = TUNNELS.lock().unwrap();
+    let map = TUNNELS.lock();
     if let Some(tunnel) = map.get(id) {
         if let Some(p) = tunnel.input_priorities.get(input_index as usize) {
             p.store(priority, std::sync::atomic::Ordering::Relaxed);
@@ -127,7 +128,7 @@ pub fn set_tunnel_input_priority(id: &str, input_index: i32, priority: bool) {
 }
 
 pub fn set_tunnel_ducking(id: &str, ducking: DuckingConfig) {
-    let map = TUNNELS.lock().unwrap();
+    let map = TUNNELS.lock();
     if let Some(tunnel) = map.get(id) {
         tunnel
             .ducking_enabled
@@ -137,11 +138,16 @@ pub fn set_tunnel_ducking(id: &str, ducking: DuckingConfig) {
     }
 }
 
-pub fn get_tunnel_sample_rate(_id: &str) -> i32 {
-    // CPAL handles sr internally, so we don't expose it exactly. Return 48000 default.
-    48000
+pub fn get_tunnel_sample_rate(id: &str) -> i32 {
+    TUNNELS
+        .lock()
+        .get(id)
+        .map_or(0, |tunnel| tunnel.sample_rate)
 }
 
-pub fn get_tunnel_channel_count(_id: &str) -> i32 {
-    2
+pub fn get_tunnel_channel_count(id: &str) -> i32 {
+    TUNNELS
+        .lock()
+        .get(id)
+        .map_or(0, |tunnel| tunnel.channel_count)
 }

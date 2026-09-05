@@ -12,34 +12,24 @@ mod platform {
 
     extern crate windows_core;
 
-    use windows::core::{implement, Interface, PCWSTR, GUID};
-    use windows_core::AsImpl;
-    use windows::Win32::Foundation::{HANDLE, WAIT_OBJECT_0, S_OK, E_FAIL, CloseHandle};
+    use windows::core::{implement, Interface, GUID, PCWSTR};
+    use windows::Win32::Foundation::{CloseHandle, E_FAIL, HANDLE, S_OK, WAIT_OBJECT_0};
     use windows::Win32::Media::Audio::{
-        ActivateAudioInterfaceAsync,
-        IAudioCaptureClient, IAudioClient,
-        IActivateAudioInterfaceAsyncOperation,
-        IActivateAudioInterfaceCompletionHandler,
-        IActivateAudioInterfaceCompletionHandler_Impl,
-        AUDCLNT_BUFFERFLAGS_SILENT,
-        AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
-        AUDIOCLIENT_ACTIVATION_PARAMS,
-        AUDIOCLIENT_ACTIVATION_PARAMS_0,
-        AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
-        AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
-        PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
+        ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation,
+        IActivateAudioInterfaceCompletionHandler, IActivateAudioInterfaceCompletionHandler_Impl,
+        IAudioCaptureClient, IAudioClient, AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED,
+        AUDCLNT_STREAMFLAGS_LOOPBACK, AUDIOCLIENT_ACTIVATION_PARAMS,
+        AUDIOCLIENT_ACTIVATION_PARAMS_0, AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
+        AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
         WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
     };
-    use windows::Win32::System::Com::{
-        CoInitializeEx, CoUninitialize,
-        COINIT_MULTITHREADED,
-    };
     use windows::Win32::System::Com::StructuredStorage::PROPVARIANT;
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
     use windows::Win32::System::Threading::{CreateEventW, SetEvent, WaitForSingleObject};
     use windows::Win32::System::Variant::VT_BLOB;
+    use windows_core::AsImpl;
 
     // ===== Well-known audio format constants =====
-
 
     /// WAVE_FORMAT_EXTENSIBLE (0xFFFE)
     const WAVE_FORMAT_EXTENSIBLE_TAG: u16 = 0xFFFE;
@@ -53,14 +43,13 @@ mod platform {
     const SPEAKER_FRONT_STEREO: u32 = 0x1 | 0x2;
 
     /// The virtual audio device string for process loopback
-    const VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK: PCWSTR = windows::core::w!("VAD\\Process_Loopback");
+    const VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK: PCWSTR =
+        windows::core::w!("VAD\\Process_Loopback");
 
     /// Buffer duration in 100-nanosecond units (200 ms)
     const BUFFER_DURATION: i64 = 200 * 10000;
 
     // ===== Sample Conversion =====
-
-
 
     // ===== Callback Type =====
 
@@ -128,7 +117,9 @@ mod platform {
                     r.error = Some(format!("ActivateCompleted failed: {}", e));
                 }
             }
-            unsafe { let _ = SetEvent(self.event); }
+            unsafe {
+                let _ = SetEvent(self.event);
+            }
             // Always return S_OK from the completion handler itself
             Ok(())
         }
@@ -171,11 +162,7 @@ mod platform {
             Ok(())
         }
 
-
-        fn try_init_with_fallback_formats(
-            &self,
-            client: &IAudioClient,
-        ) -> Option<WaveFormat> {
+        fn try_init_with_fallback_formats(&self, client: &IAudioClient) -> Option<WaveFormat> {
             let target = self.target_sample_rate;
             struct FmtCandidate {
                 rate: u32,
@@ -185,11 +172,36 @@ mod platform {
             }
 
             let candidates = [
-                FmtCandidate { rate: target, channels: 2, bits: 32, is_float: true },
-                FmtCandidate { rate: 48000, channels: 2, bits: 32, is_float: true },
-                FmtCandidate { rate: 44100, channels: 2, bits: 32, is_float: true },
-                FmtCandidate { rate: 48000, channels: 2, bits: 16, is_float: false },
-                FmtCandidate { rate: 44100, channels: 2, bits: 16, is_float: false },
+                FmtCandidate {
+                    rate: target,
+                    channels: 2,
+                    bits: 32,
+                    is_float: true,
+                },
+                FmtCandidate {
+                    rate: 48000,
+                    channels: 2,
+                    bits: 32,
+                    is_float: true,
+                },
+                FmtCandidate {
+                    rate: 44100,
+                    channels: 2,
+                    bits: 32,
+                    is_float: true,
+                },
+                FmtCandidate {
+                    rate: 48000,
+                    channels: 2,
+                    bits: 16,
+                    is_float: false,
+                },
+                FmtCandidate {
+                    rate: 44100,
+                    channels: 2,
+                    bits: 16,
+                    is_float: false,
+                },
             ];
 
             for c in &candidates {
@@ -203,7 +215,8 @@ mod platform {
                         nBlockAlign: block_align,
                         nAvgBytesPerSec: c.rate * block_align as u32,
                         cbSize: (std::mem::size_of::<WAVEFORMATEXTENSIBLE>()
-                            - std::mem::size_of::<WAVEFORMATEX>()) as u16,
+                            - std::mem::size_of::<WAVEFORMATEX>())
+                            as u16,
                     },
                     Samples: windows::Win32::Media::Audio::WAVEFORMATEXTENSIBLE_0 {
                         wValidBitsPerSample: c.bits,
@@ -219,8 +232,8 @@ mod platform {
                 let result = unsafe {
                     client.Initialize(
                         AUDCLNT_SHAREMODE_SHARED,
-                        AUDCLNT_STREAMFLAGS_LOOPBACK 
-                            | windows::Win32::Media::Audio::AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM 
+                        AUDCLNT_STREAMFLAGS_LOOPBACK
+                            | windows::Win32::Media::Audio::AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
                             | windows::Win32::Media::Audio::AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
                         BUFFER_DURATION,
                         0,
@@ -274,7 +287,12 @@ mod platform {
         ///
         /// Activation (COM setup) happens on the calling thread.
         /// The capture polling loop runs on a dedicated background thread.
-        pub fn start(&mut self, callback: DataCallback, output_channels: i32, target_sample_rate: u32) {
+        pub fn start(
+            &mut self,
+            callback: DataCallback,
+            output_channels: i32,
+            target_sample_rate: u32,
+        ) {
             if self.running.load(Ordering::SeqCst) {
                 return;
             }
@@ -285,7 +303,10 @@ mod platform {
             let activation = match Self::activate(self.pid, target_sample_rate) {
                 Ok(a) => a,
                 Err(e) => {
-                    eprintln!("[app-capture] Activation failed for pid {}: {}", self.pid, e);
+                    eprintln!(
+                        "[app-capture] Activation failed for pid {}: {}",
+                        self.pid, e
+                    );
                     return;
                 }
             };
@@ -375,23 +396,36 @@ mod platform {
                 // Since the handler is now an IActivateAudioInterfaceCompletionHandler,
                 // we cast it back to our implementation.
                 let handler_ref: &CompletionHandler = handler.as_impl();
-                let result = handler_ref.result.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
+                let result = handler_ref
+                    .result
+                    .lock()
+                    .map_err(|e| format!("Lock poisoned: {}", e))?;
 
                 if let Some(ref err) = result.error {
                     return Err(err.clone());
                 }
 
-                let client = result.client.clone()
+                let client = result
+                    .client
+                    .clone()
                     .ok_or_else(|| "No audio client obtained".to_string())?;
-                let capture = result.capture.clone()
+                let capture = result
+                    .capture
+                    .clone()
                     .ok_or_else(|| "No capture client obtained".to_string())?;
-                let format = result.format.clone()
+                let format = result
+                    .format
+                    .clone()
                     .ok_or_else(|| "No format obtained".to_string())?;
 
                 // Drop the operation reference
                 drop(op);
 
-                Ok(ActivatedCapture { client, capture, format })
+                Ok(ActivatedCapture {
+                    client,
+                    capture,
+                    format,
+                })
             }
         }
     }
@@ -467,13 +501,7 @@ mod platform {
                 let mut flags = 0u32;
 
                 let get_result = unsafe {
-                    capture.GetBuffer(
-                        &mut data_ptr,
-                        &mut num_frames,
-                        &mut flags,
-                        None,
-                        None,
-                    )
+                    capture.GetBuffer(&mut data_ptr, &mut num_frames, &mut flags, None, None)
                 };
 
                 if let Err(e) = get_result {
@@ -498,12 +526,18 @@ mod platform {
                     };
                     for f in 0..num_frames as usize {
                         if out_ch == 1 && sys_ch >= 2 {
-                            let mixed = (src[f * sys_ch as usize] + src[f * sys_ch as usize + 1]) * 0.5;
+                            let mixed =
+                                (src[f * sys_ch as usize] + src[f * sys_ch as usize + 1]) * 0.5;
                             chunk_buf[f] = mixed;
                         } else {
                             for c in 0..out_ch as usize {
-                                let src_ch = if (c as i32) < sys_ch { c } else { (sys_ch - 1) as usize };
-                                chunk_buf[f * out_ch as usize + c] = src[f * sys_ch as usize + src_ch];
+                                let src_ch = if (c as i32) < sys_ch {
+                                    c
+                                } else {
+                                    (sys_ch - 1) as usize
+                                };
+                                chunk_buf[f * out_ch as usize + c] =
+                                    src[f * sys_ch as usize + src_ch];
                             }
                         }
                     }
@@ -523,7 +557,11 @@ mod platform {
                             chunk_buf[f] = mixed as f32 / 32768.0;
                         } else {
                             for c in 0..out_ch as usize {
-                                let src_ch = if (c as i32) < sys_ch { c } else { (sys_ch - 1) as usize };
+                                let src_ch = if (c as i32) < sys_ch {
+                                    c
+                                } else {
+                                    (sys_ch - 1) as usize
+                                };
                                 chunk_buf[f * out_ch as usize + c] =
                                     src[f * sys_ch as usize + src_ch] as f32 / 32768.0;
                             }
@@ -568,10 +606,20 @@ pub mod platform {
     pub struct AppCaptureStream;
 
     impl AppCaptureStream {
-        pub fn new(_pid: u32) -> Self { Self }
-        pub fn start(&mut self, _callback: DataCallback, _output_channels: i32, _target_sample_rate: u32) {}
+        pub fn new(_pid: u32) -> Self {
+            Self
+        }
+        pub fn start(
+            &mut self,
+            _callback: DataCallback,
+            _output_channels: i32,
+            _target_sample_rate: u32,
+        ) {
+        }
         pub fn stop(&mut self) {}
-        pub fn is_running(&self) -> bool { false }
+        pub fn is_running(&self) -> bool {
+            false
+        }
     }
 }
 

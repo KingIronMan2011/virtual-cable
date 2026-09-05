@@ -39,7 +39,8 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
         CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
     };
     use windows::Win32::System::Threading::{
-        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_NATIVE, PROCESS_QUERY_LIMITED_INFORMATION,
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_NATIVE,
+        PROCESS_QUERY_LIMITED_INFORMATION,
     };
 
     let mut apps = Vec::new();
@@ -52,8 +53,7 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
         let enumerator: IMMDeviceEnumerator =
             unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)? };
         let device = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole)? };
-        let session_manager: IAudioSessionManager2 =
-            unsafe { device.Activate(CLSCTX_ALL, None)? };
+        let session_manager: IAudioSessionManager2 = unsafe { device.Activate(CLSCTX_ALL, None)? };
         let session_enumerator = unsafe { session_manager.GetSessionEnumerator()? };
         let count = unsafe { session_enumerator.GetCount()? };
 
@@ -69,10 +69,11 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
                 continue;
             }
 
-            let process = match unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) } {
-                Ok(handle) => handle,
-                Err(_) => continue,
-            };
+            let process =
+                match unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) } {
+                    Ok(handle) => handle,
+                    Err(_) => continue,
+                };
 
             let mut path_buf = vec![0u16; 260];
             let mut path_len = path_buf.len() as u32;
@@ -150,10 +151,7 @@ pub fn find_app_by_exe(exe_name: &str) -> Option<AudioApp> {
 
 /// Get all unique executable names currently with audio
 pub fn get_audio_app_names() -> Vec<String> {
-    let mut names: Vec<_> = get_audio_apps()
-        .into_iter()
-        .map(|a| a.exe)
-        .collect();
+    let mut names: Vec<_> = get_audio_apps().into_iter().map(|a| a.exe).collect();
     names.sort();
     names.dedup();
     names
@@ -178,10 +176,10 @@ mod tests {
     fn test_get_audio_app_names() {
         let apps = get_audio_apps();
         let names = get_audio_app_names();
-        
+
         // Names should be subset of apps (deduped)
         assert!(names.len() <= apps.len());
-        
+
         // All names should be unique
         let mut names_sorted = names.clone();
         names_sorted.sort();

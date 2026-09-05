@@ -19,6 +19,8 @@ pub struct TunnelInputConfig {
 
 pub struct TunnelState {
     pub id: String,
+    pub sample_rate: i32,
+    pub channel_count: i32,
     pub output_stream: cpal::Stream,
     pub input_streams: Vec<cpal::Stream>,
     pub app_captures: Vec<crate::audio::app_capture::AppCaptureStream>,
@@ -37,9 +39,6 @@ pub struct TunnelState {
     pub ducking_amount: Arc<AtomicU32>,
     pub ducking_release: Arc<AtomicU32>,
 }
-
-unsafe impl Send for TunnelState {}
-unsafe impl Sync for TunnelState {}
 
 // Atomic f32 helpers
 pub fn store_f32(atomic: &AtomicU32, val: f32) {
@@ -342,6 +341,8 @@ pub fn build_tunnel(
 
     Ok(TunnelState {
         id,
+        sample_rate: sample_rate as i32,
+        channel_count: channels as i32,
         output_stream,
         input_streams,
         app_captures,

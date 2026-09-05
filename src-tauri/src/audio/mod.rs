@@ -1,18 +1,16 @@
-/// Audio module - Core audio infrastructure utilities
-/// Provides thread-safe queuing, PortAudio bindings, metering, and enumeration
-/// 
-/// Non-tunnel logic: device enumeration, app enumeration, metering callbacks, caching
-/// Tunnel logic (mixing, ducking, reader threads) remains in C++ for now
+//! Audio module - routing, enumeration, capture, metering, and caching.
+//!
+//! Audio tunnel mixing, ducking, and capture are implemented in Rust with CPAL and WASAPI.
 
-pub mod metering;
-pub mod device_enum;
+pub mod app_capture;
 pub mod app_enum;
 pub mod cache;
-pub mod app_capture;
-pub mod tunnel;
+pub mod device_enum;
 pub mod engine;
+pub mod metering;
+pub mod tunnel;
 
-pub use metering::{calculate_rms, MeteringCallback};
-pub use device_enum::{get_audio_devices, get_input_devices, get_output_devices, AudioDevice};
 pub use app_enum::{get_audio_apps, AudioApp};
-pub use cache::{EnumerationCache, global_cache};
+pub use cache::{global_cache, EnumerationCache};
+pub use device_enum::{get_audio_devices, get_input_devices, get_output_devices, AudioDevice};
+pub use metering::{calculate_rms, MeteringCallback};

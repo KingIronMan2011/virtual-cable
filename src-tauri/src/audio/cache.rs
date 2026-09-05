@@ -1,3 +1,4 @@
+use parking_lot::Mutex;
 /// Caching layer for device and app enumeration
 ///
 /// Reduces repeated FFI calls by caching results with TTL (time-to-live).
@@ -5,14 +6,12 @@
 ///
 /// Cache invalidation can be triggered by system events (device connect/disconnect)
 /// or by explicit TTL expiry.
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use parking_lot::Mutex;
 
-use crate::audio::device_enum::AudioDevice;
 use crate::audio::app_enum::AudioApp;
-use crate::audio::{device_enum, app_enum};
+use crate::audio::device_enum::AudioDevice;
+use crate::audio::{app_enum, device_enum};
 
 // ===== Cache Entries =====
 
@@ -182,8 +181,7 @@ impl Default for EnumerationCache {
 // ===== Global Instance =====
 
 /// Global cache instance for use throughout the application
-pub static ENUM_CACHE: std::sync::OnceLock<EnumerationCache> =
-    std::sync::OnceLock::new();
+pub static ENUM_CACHE: std::sync::OnceLock<EnumerationCache> = std::sync::OnceLock::new();
 
 /// Get or initialize the global enumeration cache
 pub fn global_cache() -> &'static EnumerationCache {
@@ -197,10 +195,10 @@ mod tests {
     #[test]
     fn test_cache_hit() {
         let cache = EnumerationCache::with_ttl(Duration::from_secs(60), Duration::from_secs(10));
-        
+
         let devices1 = cache.get_devices();
         let devices2 = cache.get_devices();
-        
+
         // Both should return same object (cache hit)
         assert_eq!(devices1.len(), devices2.len());
     }
@@ -208,10 +206,10 @@ mod tests {
     #[test]
     fn test_cache_invalidation() {
         let cache = EnumerationCache::with_ttl(Duration::from_secs(60), Duration::from_secs(10));
-        
+
         let _ = cache.get_devices();
         assert!(cache.is_device_cache_valid());
-        
+
         cache.invalidate_devices();
         assert!(!cache.is_device_cache_valid());
     }
@@ -219,10 +217,10 @@ mod tests {
     #[test]
     fn test_cache_expiry() {
         let cache = EnumerationCache::with_ttl(Duration::from_millis(100), Duration::from_secs(10));
-        
+
         let _ = cache.get_devices();
         assert!(cache.is_device_cache_valid());
-        
+
         std::thread::sleep(Duration::from_millis(150));
         assert!(!cache.is_device_cache_valid());
     }
@@ -230,14 +228,14 @@ mod tests {
     #[test]
     fn test_get_input_output_devices() {
         let cache = EnumerationCache::new();
-        
+
         let inputs = cache.get_input_devices();
         let outputs = cache.get_output_devices();
-        
+
         for input in &inputs {
             assert!(input.max_input_channels > 0);
         }
-        
+
         for output in &outputs {
             assert!(output.max_output_channels > 0);
         }
