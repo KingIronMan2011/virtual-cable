@@ -71,7 +71,7 @@ export default function HotkeyInput({
       <div className="hotkey-field-wrapper">
         <button
           ref={btnRef}
-          className={`hotkey-record-btn${isRecording ? " is-recording" : ""}${!value ? " is-empty" : ""}`}
+          className={`hotkey-record-btn${isRecording ? "is-recording" : ""}${!value ? "is-empty" : ""}`}
           onClick={() => setIsRecording(!isRecording)}
           onKeyDown={handleKeyDown}
           onBlur={() => setIsRecording(false)}

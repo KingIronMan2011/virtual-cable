@@ -19,8 +19,8 @@ const DIRECT_DOWNLOAD_URL = `/releases/Virtual Cable_${__APP_VERSION__}_x64-setu
 
 function Header() {
   return (
-    <header className="fixed top-0 inset-x-0 z-50 border-b border-surface-border bg-bg/80 backdrop-blur-md">
-      <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-14">
+    <header className="border-surface-border bg-bg/80 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <div className="flex items-center gap-2 font-semibold text-white">
           <Cable size={18} className="text-brand" />
           Virtual Cable
@@ -30,7 +30,7 @@ function Header() {
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-white"
           >
             <LuGithub size={15} />
             GitHub
@@ -38,7 +38,7 @@ function Header() {
           <a
             href={DIRECT_DOWNLOAD_URL}
             download
-            className="flex items-center gap-1.5 text-sm bg-brand hover:bg-brand-dim text-black font-medium px-3 py-1.5 rounded-md transition-colors"
+            className="bg-brand hover:bg-brand-dim flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-black transition-colors"
           >
             <Download size={14} />
             Download
@@ -53,11 +53,11 @@ function Header() {
 
 function CableAnimation() {
   return (
-    <div className="flex items-center gap-0 my-10">
+    <div className="my-10 flex items-center gap-0">
       {/* Jack plug */}
-      <div className="w-3 h-3 rounded-full bg-brand shadow-[0_0_12px_#f59e0b]" />
+      <div className="bg-brand h-3 w-3 rounded-full shadow-[0_0_12px_#f59e0b]" />
       {/* Cable track */}
-      <div className="relative h-1 w-48 bg-surface-raised rounded-full overflow-hidden">
+      <div className="bg-surface-raised relative h-1 w-48 overflow-hidden rounded-full">
         <div
           className="absolute inset-y-0 left-0 w-16 rounded-full"
           style={{
@@ -68,7 +68,7 @@ function CableAnimation() {
         />
       </div>
       {/* Jack plug */}
-      <div className="w-3 h-3 rounded-full bg-brand shadow-[0_0_12px_#f59e0b]" />
+      <div className="bg-brand h-3 w-3 rounded-full shadow-[0_0_12px_#f59e0b]" />
       <style>{`
         @keyframes slide {
           from { transform: translateX(-64px); }
@@ -81,20 +81,20 @@ function CableAnimation() {
 
 function Hero() {
   return (
-    <section className="pt-32 pb-24 px-6 text-center">
+    <section className="px-6 pt-32 pb-24 text-center">
       <div className="mx-auto max-w-3xl">
-        <div className="inline-flex items-center gap-2 text-xs font-medium text-brand bg-amber-950/40 border border-amber-900/40 rounded-full px-3 py-1 mb-6">
+        <div className="text-brand mb-6 inline-flex items-center gap-2 rounded-full border border-amber-900/40 bg-amber-950/40 px-3 py-1 text-xs font-medium">
           <Zap size={11} />
           Free &amp; open source
         </div>
 
-        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white leading-tight">
+        <h1 className="text-5xl leading-tight font-bold tracking-tight text-white sm:text-6xl">
           Route audio
           <br />
           <span className="text-brand">anywhere.</span>
         </h1>
 
-        <p className="mt-5 text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
+        <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-zinc-400">
           Virtual Cable lets you patch any audio source to any destination on
           your PC — no drivers, no fuss. Built for streamers, podcasters, and
           producers.
@@ -104,11 +104,11 @@ function Hero() {
           <CableAnimation />
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <a
             href={DIRECT_DOWNLOAD_URL}
             download
-            className="flex items-center gap-2 bg-brand hover:bg-brand-dim text-black font-semibold px-5 py-2.5 rounded-lg transition-colors"
+            className="bg-brand hover:bg-brand-dim flex items-center gap-2 rounded-lg px-5 py-2.5 font-semibold text-black transition-colors"
           >
             <Download size={16} />
             Download for Windows
@@ -117,7 +117,7 @@ function Hero() {
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2 text-zinc-300 hover:text-white border border-surface-border hover:border-zinc-600 px-5 py-2.5 rounded-lg transition-colors"
+            className="border-surface-border flex items-center gap-2 rounded-lg border px-5 py-2.5 text-zinc-300 transition-colors hover:border-zinc-600 hover:text-white"
           >
             <LuGithub size={16} />
             View source
@@ -171,10 +171,10 @@ function Features() {
   return (
     <section
       id="features"
-      className="py-20 px-6 border-t border-surface-border"
+      className="border-surface-border border-t px-6 py-20"
     >
       <div className="mx-auto max-w-6xl">
-        <div className="text-center mb-12">
+        <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-white">Everything you need</h2>
           <p className="mt-2 text-zinc-400">
             Simple enough to set up in seconds. Powerful enough for complex
@@ -182,17 +182,17 @@ function Features() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, body }) => (
             <div
               key={title}
-              className="bg-surface-raised border border-surface-border rounded-xl p-5 hover:border-zinc-700 transition-colors"
+              className="bg-surface-raised border-surface-border rounded-xl border p-5 transition-colors hover:border-zinc-700"
             >
-              <div className="w-8 h-8 rounded-lg bg-amber-950/60 flex items-center justify-center mb-3">
+              <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-950/60">
                 <Icon size={16} className="text-brand" />
               </div>
-              <h3 className="font-semibold text-white mb-1">{title}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{body}</p>
+              <h3 className="mb-1 font-semibold text-white">{title}</h3>
+              <p className="text-sm leading-relaxed text-zinc-400">{body}</p>
             </div>
           ))}
         </div>
@@ -223,27 +223,27 @@ const STEPS = [
 
 function HowItWorks() {
   return (
-    <section className="py-20 px-6 border-t border-surface-border">
+    <section className="border-surface-border border-t px-6 py-20">
       <div className="mx-auto max-w-4xl">
-        <div className="text-center mb-12">
+        <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold text-white">Up in 30 seconds</h2>
           <p className="mt-2 text-zinc-400">
             No configuration files, no reboots.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start">
+        <div className="flex flex-col items-start gap-4 sm:flex-row">
           {STEPS.map(({ n, title, body }, i) => (
-            <div key={n} className="flex-1 flex flex-col items-start">
-              <span className="text-xs font-mono font-bold text-brand mb-3">
+            <div key={n} className="flex flex-1 flex-col items-start">
+              <span className="text-brand mb-3 font-mono text-xs font-bold">
                 {n}
               </span>
-              <h3 className="font-semibold text-white mb-2">{title}</h3>
-              <p className="text-sm text-zinc-400 leading-relaxed">{body}</p>
+              <h3 className="mb-2 font-semibold text-white">{title}</h3>
+              <p className="text-sm leading-relaxed text-zinc-400">{body}</p>
               {i < STEPS.length - 1 && (
                 <ArrowRight
                   size={18}
-                  className="hidden sm:block text-zinc-700 mt-4 self-end"
+                  className="mt-4 hidden self-end text-zinc-700 sm:block"
                 />
               )}
             </div>
@@ -258,20 +258,20 @@ function HowItWorks() {
 
 function DownloadCTA() {
   return (
-    <section className="py-20 px-6 border-t border-surface-border">
+    <section className="border-surface-border border-t px-6 py-20">
       <div className="mx-auto max-w-2xl text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-950/60 border border-amber-900/40 mb-5">
+        <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-amber-900/40 bg-amber-950/60">
           <Cable size={22} className="text-brand" />
         </div>
-        <h2 className="text-3xl font-bold text-white mb-3">Ready to patch?</h2>
-        <p className="text-zinc-400 mb-7">
+        <h2 className="mb-3 text-3xl font-bold text-white">Ready to patch?</h2>
+        <p className="mb-7 text-zinc-400">
           Free forever. No account. No telemetry beyond an anonymous install
           count.
         </p>
         <a
           href={DIRECT_DOWNLOAD_URL}
           download
-          className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dim text-black font-semibold px-6 py-3 rounded-lg transition-colors text-sm"
+          className="bg-brand hover:bg-brand-dim inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold text-black transition-colors"
         >
           <Download size={16} />
           Download latest release
@@ -285,8 +285,8 @@ function DownloadCTA() {
 
 function Footer() {
   return (
-    <footer className="border-t border-surface-border py-8 px-6">
-      <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-zinc-600">
+    <footer className="border-surface-border border-t px-6 py-8">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-sm text-zinc-600 sm:flex-row">
         <div className="flex items-center gap-2">
           <Cable size={14} className="text-zinc-700" />
           Virtual Cable — MIT License
@@ -296,7 +296,7 @@ function Footer() {
             href={GITHUB_URL}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 hover:text-zinc-400 transition-colors"
+            className="flex items-center gap-1.5 transition-colors hover:text-zinc-400"
           >
             <LuGithub size={14} />
             GitHub
@@ -305,7 +305,7 @@ function Footer() {
             href={`${GITHUB_URL}/releases`}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-zinc-400 transition-colors"
+            className="transition-colors hover:text-zinc-400"
           >
             Releases
           </a>
@@ -313,7 +313,7 @@ function Footer() {
             href={`${GITHUB_URL}/issues`}
             target="_blank"
             rel="noreferrer"
-            className="hover:text-zinc-400 transition-colors"
+            className="transition-colors hover:text-zinc-400"
           >
             Issues
           </a>
@@ -327,7 +327,7 @@ function Footer() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-bg text-white">
+    <div className="bg-bg min-h-screen text-white">
       <Header />
       <main>
         <Hero />

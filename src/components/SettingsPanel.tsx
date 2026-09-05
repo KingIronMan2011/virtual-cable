@@ -152,12 +152,12 @@ export default function SettingsPanel({ open, onClose }: Props) {
     <>
       {/* Backdrop */}
       <div
-        className={`settings-backdrop${open ? " is-open" : ""}`}
+        className={`settings-backdrop${open ? "is-open" : ""}`}
         onClick={onClose}
       />
 
       {/* Panel */}
-      <aside className={`settings-panel${open ? " is-open" : ""}`}>
+      <aside className={`settings-panel${open ? "is-open" : ""}`}>
         <div className="settings-header">
           <span className="settings-title">Settings</span>
           <button className="settings-close" onClick={onClose}>

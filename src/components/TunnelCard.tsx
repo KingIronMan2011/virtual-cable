@@ -220,7 +220,7 @@ export default function TunnelCard({
 
   return (
     <div
-      className={`cable-card${tunnel.active ? " is-active" : ""}`}
+      className={`cable-card${tunnel.active ? "is-active" : ""}`}
       tabIndex={0}
       onKeyDown={(e) => {
         // Don't trigger if user is typing in an input/select inside the card
@@ -343,12 +343,12 @@ export default function TunnelCard({
                   title="Per-input gain (double-click to reset)"
                 />
                 <span
-                  className={`gain-val${inp.gain !== 1 ? " is-adjusted" : ""}`}
+                  className={`gain-val${inp.gain !== 1 ? "is-adjusted" : ""}`}
                 >
                   {dbLabel(inp.gain)}
                 </span>
                 <button
-                  className={`icon-btn${inp.priority ? " is-priority" : ""}`}
+                  className={`icon-btn${inp.priority ? "is-priority" : ""}`}
                   onClick={() =>
                     onSetInputPriority(tunnel.id, i, !inp.priority)
                   }
@@ -419,7 +419,7 @@ export default function TunnelCard({
                         : `M ${jx} ${iy} C ${mx} ${iy} ${mx} ${oy} ${bx} ${oy}`
                     }
                     fill="none"
-                    className={`c-branch${act ? " is-active" : ""}`}
+                    className={`c-branch${act ? "is-active" : ""}`}
                   />
                 ))}
                 {/* Output track (multi-input only; single reuses the branch path) */}
@@ -429,7 +429,7 @@ export default function TunnelCard({
                     y1={oy}
                     x2={ox}
                     y2={oy}
-                    className={`c-branch${act ? " is-active" : ""}`}
+                    className={`c-branch${act ? "is-active" : ""}`}
                   />
                 )}
                 {/* Animated pulse travelling along the output segment */}
@@ -449,7 +449,7 @@ export default function TunnelCard({
                     cx={jx}
                     cy={iy}
                     r={5}
-                    className={`c-jack${act ? " is-active" : ""}`}
+                    className={`c-jack${act ? "is-active" : ""}`}
                   />
                 ))}
                 {/* Junction dot where all branches converge */}
@@ -458,7 +458,7 @@ export default function TunnelCard({
                     cx={bx}
                     cy={oy}
                     r={4}
-                    className={`c-jack${act ? " is-active" : ""}`}
+                    className={`c-jack${act ? "is-active" : ""}`}
                   />
                 )}
                 {/* Output jack */}
@@ -466,7 +466,7 @@ export default function TunnelCard({
                   cx={ox}
                   cy={oy}
                   r={5}
-                  className={`c-jack${act ? " is-active" : ""}`}
+                  className={`c-jack${act ? "is-active" : ""}`}
                 />
               </svg>
             );
@@ -524,7 +524,7 @@ export default function TunnelCard({
       <div className="controls-row">
         <div className="ch-picker">
           <button
-            className={`ch-btn${tunnel.channelCount === null ? " is-active" : ""}`}
+            className={`ch-btn${tunnel.channelCount === null ? "is-active" : ""}`}
             onClick={() => set({ channelCount: null })}
           >
             Auto
@@ -537,7 +537,7 @@ export default function TunnelCard({
           {channelOptions.map((n) => (
             <button
               key={n}
-              className={`ch-btn${tunnel.channelCount === n ? " is-active" : ""}`}
+              className={`ch-btn${tunnel.channelCount === n ? "is-active" : ""}`}
               onClick={() => set({ channelCount: n })}
             >
               {n === 1 ? "Mono" : n === 2 ? "Stereo" : `${n}ch`}
@@ -556,9 +556,7 @@ export default function TunnelCard({
             onDoubleClick={() => onSetGain(tunnel.id, 1)}
             title="Master gain — double-click to reset to 0 dB"
           />
-          <span
-            className={`gain-val${tunnel.gain !== 1 ? " is-adjusted" : ""}`}
-          >
+          <span className={`gain-val${tunnel.gain !== 1 ? "is-adjusted" : ""}`}>
             {dbLabel(tunnel.gain)} dB
           </span>
         </div>
@@ -568,7 +566,7 @@ export default function TunnelCard({
       {tunnel.inputs.length > 1 && (
         <div className="ducking-row">
           <button
-            className={`duck-toggle${tunnel.duckingEnabled ? " is-active" : ""}`}
+            className={`duck-toggle${tunnel.duckingEnabled ? "is-active" : ""}`}
             onClick={() =>
               onSetDucking(
                 tunnel.id,
@@ -639,7 +637,7 @@ export default function TunnelCard({
       {/* ── Footer: toggle + mute ── */}
       <div className="card-foot">
         <button
-          className={`cable-toggle${tunnel.active ? " is-active" : ""}`}
+          className={`cable-toggle${tunnel.active ? "is-active" : ""}`}
           onClick={() => onToggleActive(tunnel.id)}
           disabled={!canActivate || isToggling}
           title={
@@ -654,7 +652,7 @@ export default function TunnelCard({
           {tunnel.active ? "Live" : "Offline"}
         </button>
         <button
-          className={`cable-mute${tunnel.muted ? " is-muted" : ""}`}
+          className={`cable-mute${tunnel.muted ? "is-muted" : ""}`}
           onClick={() => {
             if (tunnel.active) onToggleMute(tunnel.id);
           }}

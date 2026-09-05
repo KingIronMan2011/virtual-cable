@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without a v prefix (for example, 1.4.6)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate release version
+        id: version
+        run: |
+          requested="${{ inputs.version }}"
+          package_version=$(jq -r .version package.json)
+          tauri_version=$(jq -r .version src-tauri/tauri.conf.json)
+          cargo_version=$(awk -F '"' '/^version = / { print $2; exit }' src-tauri/Cargo.toml)
+
+          if [[ ! "$requested" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release version must be a semantic version without the v prefix."
+            exit 1
+          fi
+
+          if [[ "$requested" != "$package_version" || "$requested" != "$tauri_version" || "$requested" != "$cargo_version" ]]; then
+            echo "Version mismatch: requested=$requested, package.json=$package_version, tauri.conf.json=$tauri_version, Cargo.toml=$cargo_version"
+            exit 1
+          fi
+
+          echo "version=$requested" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure the release does not already exist
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Release v${{ steps.version.outputs.version }} already exists. Bump the version before releasing."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build-windows:
+    name: Build signed Windows installer
+    needs: prepare
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build signed installer
+        run: pnpm run build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Upload installer and updater signature
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.sig
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [prepare, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
+      - name: Create GitHub Release
+        run: |
+          mapfile -t files < <(find release-assets -type f \( -name '*.exe' -o -name '*.sig' \))
+          gh release create "v${{ needs.prepare.outputs.version }}" \
+            --title "Virtual Cable v${{ needs.prepare.outputs.version }}" \
+            --generate-notes \
+            "${files[@]}"
+        env:
+          GH_TOKEN: ${{ github.token }}

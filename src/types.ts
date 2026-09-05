@@ -59,12 +59,7 @@ export interface AppSettings {
 }
 
 export type UpdateStatus =
-  | "idle"
-  | "checking"
-  | "available"
-  | "not-available"
-  | "ready"
-  | "error";
+  "idle" | "checking" | "available" | "not-available" | "ready" | "error";
 
 export interface UpdateState {
   status: UpdateStatus;
@@ -73,12 +68,7 @@ export interface UpdateState {
 }
 
 export type InstallState =
-  | "idle"
-  | "downloading"
-  | "extracting"
-  | "launching"
-  | "done"
-  | "error";
+  "idle" | "downloading" | "extracting" | "launching" | "done" | "error";
 
 export type ProgressCallback = (
   stage: "downloading" | "extracting" | "launching",

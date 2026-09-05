@@ -431,7 +431,7 @@ export default function App() {
       {/* Progress / error toast — shown while downloading/installing */}
       {showProgress && (
         <div
-          className={`vb-toast${installState === "error" ? " is-error" : ""}`}
+          className={`vb-toast${installState === "error" ? "is-error" : ""}`}
         >
           <div className="vb-toast-content">
             <div className="vb-toast-row">
