@@ -2,6 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+const isWindows =
+  process.env.TAURI_PLATFORM === "windows" || process.platform === "win32";
+
 // Vite configuration for Tauri
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -12,7 +15,7 @@ export default defineConfig({
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {
-    target: process.env.TAURI_PLATFORM == "windows" ? "chrome105" : "safari13",
+    target: isWindows ? "chrome105" : "safari14",
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_DEBUG,
     rollupOptions: {
