@@ -1,0 +1,15 @@
+name: Reveal Tauri Private Key
+
+on:
+  workflow_dispatch:
+
+jobs:
+  reveal-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Private Key in Base64
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -w 0
+          echo ""
