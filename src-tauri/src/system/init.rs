@@ -1,3 +1,4 @@
+use std::fs;
 /// System initialization and resource setup
 ///
 /// Handles runtime initialization tasks:
@@ -6,9 +7,7 @@
 /// - Plugin loading
 ///
 /// Called early in application startup (main.rs setup phase)
-
 use std::path::PathBuf;
-use std::fs;
 
 // ===== DLL Management =====
 
@@ -19,15 +18,15 @@ pub fn initialize_system() -> Result<(), String> {
 }
 
 /// Extract and verify PortAudio DLL at runtime
-/// 
+///
 /// Ensures PortAudio is available in the expected location:
 /// - Windows: %APPDATA%/Virtual Cable/portaudio.dll
 /// - Other platforms: no-op (PortAudio linked statically or via system libraries)
 #[cfg(target_os = "windows")]
 fn initialize_portaudio_dll() -> Result<(), String> {
-    let app_data = std::env::var("APPDATA")
-        .map_err(|_| "APPDATA environment variable not set".to_string())?;
-    
+    let app_data =
+        std::env::var("APPDATA").map_err(|_| "APPDATA environment variable not set".to_string())?;
+
     let target_dir = PathBuf::from(app_data).join("Virtual Cable");
     let target_path = target_dir.join("portaudio.dll");
 
@@ -37,7 +36,7 @@ fn initialize_portaudio_dll() -> Result<(), String> {
 
     // For now, assume PortAudio DLL is available via system PATH or embedded in the binary
     // This is a placeholder for future DLL extraction logic
-    
+
     if !target_path.exists() {
         // DLL not found - log warning but don't fail
         // The build system should handle DLL packaging
@@ -56,8 +55,7 @@ fn initialize_portaudio_dll() -> Result<(), String> {
 /// Get the recommended PortAudio DLL installation path
 #[cfg(target_os = "windows")]
 pub fn get_portaudio_dll_path() -> Result<PathBuf, String> {
-    let app_data = std::env::var("APPDATA")
-        .map_err(|_| "APPDATA not set".to_string())?;
+    let app_data = std::env::var("APPDATA").map_err(|_| "APPDATA not set".to_string())?;
     Ok(PathBuf::from(app_data)
         .join("Virtual Cable")
         .join("portaudio.dll"))
@@ -78,8 +76,7 @@ pub fn verify_portaudio_dll() -> Result<bool, String> {
             return Ok(false);
         }
 
-        let metadata = fs::metadata(&path)
-            .map_err(|e| format!("Failed to stat DLL: {}", e))?;
+        let metadata = fs::metadata(&path).map_err(|e| format!("Failed to stat DLL: {}", e))?;
 
         // DLL should be at least 100KB and at most 10MB
         let size = metadata.len();

@@ -26,7 +26,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI1NDcyODJGRDAyN0FCREMKUldUY3F5ZlFMeWhIdFVPbENUMTRUQmNnTTlTbmdQWGFEZnluTWZNbzJ5QkpEbzM0bmMra2EwQnAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ3QjBCODAxODc1N0MxOUUKUldTZXdWZUhBYml3UjU1U1JiZHcyam56dm1OUGw5SVFZRW1FS2kvd1hPSUh4ZkdyS3Y3RW00ZFoK",
       "endpoints": ["https://virtual-cable.kingironman.dev/updates.json"],
       "windows": {
         "installMode": "passive"

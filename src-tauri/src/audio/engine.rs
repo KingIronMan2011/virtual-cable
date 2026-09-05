@@ -7,7 +7,7 @@ use crate::audio::tunnel::{
     build_tunnel, store_f32, DuckingConfig, TunnelInputConfig, TunnelState,
 };
 
-type LevelCallback = Box<dyn Fn(String, f32) + Send + Sync>;
+type LevelCallback = Arc<dyn Fn(String, f32) + Send + Sync>;
 type SharedLevelCallback = Arc<Mutex<Option<LevelCallback>>>;
 
 static TUNNELS: Lazy<Mutex<HashMap<String, TunnelState>>> =
@@ -23,14 +23,21 @@ pub fn initialize() {
         while RUNNING.load(std::sync::atomic::Ordering::Relaxed) {
             std::thread::sleep(std::time::Duration::from_millis(50)); // ~20fps
 
-            {
-                let cb_lock = LEVEL_CALLBACK.lock();
-                if let Some(cb) = cb_lock.as_ref() {
-                    let tunnels = TUNNELS.lock();
-                    for (id, state) in tunnels.iter() {
-                        let level = crate::audio::tunnel::load_f32(&state.current_level);
-                        cb(id.clone(), level);
-                    }
+            let callback = LEVEL_CALLBACK.lock().clone();
+            let levels: Vec<_> = TUNNELS
+                .lock()
+                .iter()
+                .map(|(id, state)| {
+                    (
+                        id.clone(),
+                        crate::audio::tunnel::load_f32(&state.current_level),
+                    )
+                })
+                .collect();
+
+            if let Some(callback) = callback {
+                for (id, level) in levels {
+                    callback(id, level);
                 }
             }
         }
@@ -44,7 +51,7 @@ pub fn terminate() {
 
 pub fn set_level_callback(cb: impl Fn(String, f32) + Send + Sync + 'static) {
     let mut cb_lock = LEVEL_CALLBACK.lock();
-    *cb_lock = Some(Box::new(cb));
+    *cb_lock = Some(Arc::new(cb));
 }
 
 pub fn create_tunnel(

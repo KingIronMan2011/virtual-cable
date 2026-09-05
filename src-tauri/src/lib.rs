@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, Emitter};
 use std::sync::OnceLock;
+use tauri::{AppHandle, Emitter, Manager};
 
 // --- Modules ---
 pub mod audio;
@@ -97,12 +97,15 @@ fn create_tunnel(
     channel_count: Option<i32>,
     ducking: DuckingConfig,
 ) -> Result<(), String> {
-    let inputs = inputs.into_iter().map(|i| audio::tunnel::TunnelInputConfig {
-        device_id: i.deviceId,
-        app_pid: i.appPid.unwrap_or(0),
-        gain: i.gain,
-        priority: i.priority,
-    }).collect();
+    let inputs = inputs
+        .into_iter()
+        .map(|i| audio::tunnel::TunnelInputConfig {
+            device_id: i.deviceId,
+            app_pid: i.appPid.unwrap_or(0),
+            gain: i.gain,
+            priority: i.priority,
+        })
+        .collect();
 
     let ducking_cfg = audio::tunnel::DuckingConfig {
         enabled: ducking.enabled,
@@ -149,11 +152,14 @@ fn set_tunnel_input_priority(id: String, input_index: i32, priority: bool) {
 
 #[tauri::command]
 fn set_tunnel_ducking(id: String, enabled: bool, amount: f32, release: f32) {
-    audio::engine::set_tunnel_ducking(&id, audio::tunnel::DuckingConfig {
-        enabled,
-        amount,
-        release,
-    });
+    audio::engine::set_tunnel_ducking(
+        &id,
+        audio::tunnel::DuckingConfig {
+            enabled,
+            amount,
+            release,
+        },
+    );
 }
 
 #[tauri::command]
@@ -193,8 +199,10 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
-                let settings = storage::commands::load_settings(app.clone());
-                let minimize_to_tray = settings.get("minimizeToTray")
+                let settings =
+                    tauri::async_runtime::block_on(storage::commands::load_settings(app.clone()));
+                let minimize_to_tray = settings
+                    .get("minimizeToTray")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
 
@@ -207,8 +215,8 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState};
             use tauri::menu::{Menu, MenuItem};
+            use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder};
 
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
@@ -217,27 +225,27 @@ pub fn run() {
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "quit" => {
-                            audio::engine::terminate();
-                            app.exit(0);
-                        }
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.unminimize();
-                                let _ = window.set_focus();
-                            }
-                        }
-                        _ => {}
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => {
+                        audio::engine::terminate();
+                        app.exit(0);
                     }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click { 
-                        button: MouseButton::Left, 
-                        button_state: MouseButtonState::Up, .. 
-                    } = event {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();

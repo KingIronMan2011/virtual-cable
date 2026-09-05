@@ -1,3 +1,4 @@
+use parking_lot::Mutex;
 /// UI tray icon management and menu interactions
 ///
 /// Manages system tray integration with menu actions:
@@ -7,9 +8,7 @@
 ///
 /// Tauri handles the underlying tray functionality;
 /// this module provides state management and integration.
-
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 // ===== Tray State =====
 
@@ -137,7 +136,7 @@ mod tests {
     #[test]
     fn test_tray_toggle_visibility() {
         let ctx = TrayContext::new();
-        
+
         let new_state = ctx.toggle_visibility();
         match new_state {
             TrayState::Visible => {} // Expected

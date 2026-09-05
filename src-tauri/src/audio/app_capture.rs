@@ -6,6 +6,7 @@
 
 #[cfg(target_os = "windows")]
 mod platform {
+    use parking_lot::Mutex;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::thread;
@@ -66,7 +67,7 @@ mod platform {
     struct CompletionHandler {
         event: HANDLE,
         target_sample_rate: u32,
-        result: std::sync::Mutex<ActivationResult>,
+        result: Mutex<ActivationResult>,
     }
 
     struct ActivationResult {
@@ -92,7 +93,7 @@ mod platform {
             Self {
                 event,
                 target_sample_rate,
-                result: std::sync::Mutex::new(ActivationResult {
+                result: Mutex::new(ActivationResult {
                     client: None,
                     capture: None,
                     format: None,
@@ -113,9 +114,7 @@ mod platform {
                 Err(E_FAIL.into())
             };
             if let Err(ref e) = result {
-                if let Ok(mut r) = self.result.lock() {
-                    r.error = Some(format!("ActivateCompleted failed: {}", e));
-                }
+                self.result.lock().error = Some(format!("ActivateCompleted failed: {}", e));
             }
             unsafe {
                 let _ = SetEvent(self.event);
@@ -145,7 +144,7 @@ mod platform {
             let format = match self.try_init_with_fallback_formats(&client) {
                 Some(fmt) => fmt,
                 None => {
-                    let mut r = self.result.lock().unwrap();
+                    let mut r = self.result.lock();
                     r.error = Some("Failed to initialize audio client with any format".into());
                     return Err(E_FAIL.into());
                 }
@@ -154,7 +153,7 @@ mod platform {
             // Get capture client
             let capture: IAudioCaptureClient = unsafe { client.GetService()? };
 
-            let mut r = self.result.lock().unwrap();
+            let mut r = self.result.lock();
             r.client = Some(client);
             r.capture = Some(capture);
             r.format = Some(format);
@@ -396,10 +395,7 @@ mod platform {
                 // Since the handler is now an IActivateAudioInterfaceCompletionHandler,
                 // we cast it back to our implementation.
                 let handler_ref: &CompletionHandler = handler.as_impl();
-                let result = handler_ref
-                    .result
-                    .lock()
-                    .map_err(|e| format!("Lock poisoned: {}", e))?;
+                let result = handler_ref.result.lock();
 
                 if let Some(ref err) = result.error {
                     return Err(err.clone());

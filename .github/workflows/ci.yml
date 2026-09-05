@@ -36,3 +36,18 @@ jobs:
 
       - name: Verify TypeScript types
         run: pnpm run types
+
+  rust:
+    name: Rust backend
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Compile Rust backend
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Test Rust backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml

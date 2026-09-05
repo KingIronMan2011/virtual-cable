@@ -7,7 +7,6 @@
 ///
 /// Uses standardized location: ~/.config/virtual-cable/ (cross-platform)
 /// Provides async I/O via tokio for non-blocking file operations
-
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -103,31 +102,23 @@ impl StorageManager {
     fn get_config_dir() -> std::io::Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
-            let app_data = std::env::var("APPDATA")
-                .map_err(|_| std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "APPDATA not set",
-                ))?;
+            let app_data = std::env::var("APPDATA").map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::NotFound, "APPDATA not set")
+            })?;
             Ok(PathBuf::from(app_data).join("Virtual Cable"))
         }
 
         #[cfg(target_os = "macos")]
         {
             let home = std::env::var("HOME")
-                .map_err(|_| std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "HOME not set",
-                ))?;
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::NotFound, "HOME not set"))?;
             Ok(PathBuf::from(home).join("Library/Application Support/Virtual Cable"))
         }
 
         #[cfg(target_os = "linux")]
         {
             let home = std::env::var("HOME")
-                .map_err(|_| std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "HOME not set",
-                ))?;
+                .map_err(|_| std::io::Error::new(std::io::ErrorKind::NotFound, "HOME not set"))?;
             Ok(PathBuf::from(home).join(".config/virtual-cable"))
         }
 
@@ -263,8 +254,17 @@ mod tests {
     #[test]
     fn test_storage_manager_paths() {
         let manager = StorageManager::default();
-        assert!(manager.tunnels_path().to_string_lossy().contains("tunnels.json"));
-        assert!(manager.settings_path().to_string_lossy().contains("settings.json"));
-        assert!(manager.window_state_path().to_string_lossy().contains("window.json"));
+        assert!(manager
+            .tunnels_path()
+            .to_string_lossy()
+            .contains("tunnels.json"));
+        assert!(manager
+            .settings_path()
+            .to_string_lossy()
+            .contains("settings.json"));
+        assert!(manager
+            .window_state_path()
+            .to_string_lossy()
+            .contains("window.json"));
     }
 }
