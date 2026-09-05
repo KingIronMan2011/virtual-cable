@@ -50,11 +50,10 @@ export default function TunnelList({
   if (tunnels.length === 0) {
     return (
       <div className="empty-state">
-        <p className="empty-heading">No cables</p>
+        <span className="empty-orbit" aria-hidden="true" />
+        <p className="empty-heading">Your routing space is empty</p>
         <p className="empty-sub">
-          Hit "+ New Cable" to patch your first
-          <br />
-          audio tunnel.
+          Create a route to connect an input with a virtual output.
         </p>
       </div>
     );

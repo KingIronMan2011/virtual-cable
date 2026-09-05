@@ -9,6 +9,7 @@ export function useTunnels(loaded: boolean) {
   // Per-tunnel serial queue
   const updateQueues = useRef(new Map<string, Promise<void>>());
   const tunnelsRef = useRef<Tunnel[]>([]);
+  const togglingRef = useRef<Set<string>>(new Set());
   tunnelsRef.current = tunnels;
 
   useEffect(() => {
@@ -64,8 +65,9 @@ export function useTunnels(loaded: boolean) {
 
   const toggleTunnelActive = useCallback(
     (id: string) => {
-      if (togglingIds.has(id)) return;
+      if (togglingRef.current.has(id)) return;
 
+      togglingRef.current.add(id);
       setTogglingIds((prev) => new Set(prev).add(id));
 
       enqueue(id, async () => {
@@ -108,7 +110,17 @@ export function useTunnels(loaded: boolean) {
           } else {
             await tauriAPI.destroyTunnel(next.id);
           }
+        } catch (error) {
+          // Never leave the UI reporting a live route when the backend rejected
+          // the stream (for example, after a device was unplugged).
+          console.error(`Failed to toggle route ${id}:`, error);
+          setTunnels((ts) =>
+            ts.map((t) =>
+              t.id === id ? { ...t, active: false, muted: false } : t,
+            ),
+          );
         } finally {
+          togglingRef.current.delete(id);
           setTogglingIds((prev) => {
             const nextSet = new Set(prev);
             nextSet.delete(id);
@@ -117,7 +129,7 @@ export function useTunnels(loaded: boolean) {
         }
       });
     },
-    [enqueue, togglingIds],
+    [enqueue],
   );
 
   const toggleTunnelMute = useCallback(

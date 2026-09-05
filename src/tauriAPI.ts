@@ -6,6 +6,13 @@ import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "./types";
 
+function updateError(error: unknown): UpdateState {
+  return {
+    status: "error",
+    error: error instanceof Error ? error.message : String(error),
+  };
+}
+
 export const tauriAPI = {
   getDevices: (): Promise<AudioDevice[]> => invoke("get_devices"),
 
@@ -74,14 +81,14 @@ export const tauriAPI = {
 
   // Updater plugin
   checkForUpdates: async (): Promise<UpdateState> => {
-    const update = await check();
-    if (!update) {
-      return { status: "not-available" };
+    try {
+      const update = await check();
+      return update
+        ? { status: "available", version: update.version }
+        : { status: "not-available" };
+    } catch (error) {
+      return updateError(error);
     }
-    if (update) {
-      return { status: "available", version: update.version };
-    }
-    return { status: "not-available" };
   },
 
   installUpdate: async (): Promise<void> => {
@@ -93,14 +100,14 @@ export const tauriAPI = {
   },
 
   getUpdateState: async (): Promise<UpdateState> => {
-    const update = await check();
-    if (!update) {
-      return { status: "idle" };
+    try {
+      const update = await check();
+      return update
+        ? { status: "available", version: update.version }
+        : { status: "not-available" };
+    } catch (error) {
+      return updateError(error);
     }
-    if (update) {
-      return { status: "available", version: update.version };
-    }
-    return { status: "not-available" };
   },
 
   onUpdateStatus: (_cb: (state: UpdateState) => void) => () => {},

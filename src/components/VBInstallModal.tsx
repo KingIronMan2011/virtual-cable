@@ -1,4 +1,4 @@
-import { ExternalLink, Hexagon } from "lucide-react";
+import { Cable, ExternalLink, ShieldCheck } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -19,7 +19,7 @@ export default function VBInstallModal({
     <div className="modal-overlay" onClick={onDismiss}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-icon">
-          <Hexagon size={32} strokeWidth={1.25} />
+          <Cable size={28} strokeWidth={1.75} />
         </div>
         <h2 className="modal-title">VB-Audio not detected</h2>
         <p className="modal-body">
@@ -28,6 +28,7 @@ export default function VBInstallModal({
           under a minute.
         </p>
         <p className="modal-note">
+          <ShieldCheck size={15} strokeWidth={2.25} />
           <strong>Auto-install</strong> downloads the driver zip and launches
           the installer for you. A UAC prompt will appear to allow the kernel
           driver install. Restart this app once done.

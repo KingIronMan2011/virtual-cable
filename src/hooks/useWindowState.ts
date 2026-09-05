@@ -6,7 +6,10 @@ export function useWindowState(loaded: boolean) {
   useEffect(() => {
     if (!loaded) return;
 
-    (async () => {
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+
+    const listen = async () => {
       const appWindow = WebviewWindow.getCurrent();
 
       const saveWindowState = async () => {
@@ -26,17 +29,32 @@ export function useWindowState(loaded: boolean) {
         saveTimer = setTimeout(saveWindowState, 500);
       };
 
-      const unlistenMove = await appWindow.onMoved(debouncedSave);
-      const unlistenResize = await appWindow.onResized(debouncedSave);
-      const unlistenCloseRequested =
-        await appWindow.onCloseRequested(saveWindowState);
+      try {
+        const [unlistenMove, unlistenResize, unlistenCloseRequested] =
+          await Promise.all([
+            appWindow.onMoved(debouncedSave),
+            appWindow.onResized(debouncedSave),
+            appWindow.onCloseRequested(saveWindowState),
+          ]);
 
-      return () => {
-        unlistenMove();
-        unlistenResize();
-        unlistenCloseRequested();
-        if (saveTimer) clearTimeout(saveTimer);
-      };
-    })();
+        const dispose = () => {
+          unlistenMove();
+          unlistenResize();
+          unlistenCloseRequested();
+          if (saveTimer) clearTimeout(saveTimer);
+        };
+
+        if (disposed) dispose();
+        else cleanup = dispose;
+      } catch (error) {
+        console.error("Failed to restore window state listeners:", error);
+      }
+    };
+
+    void listen();
+    return () => {
+      disposed = true;
+      cleanup?.();
+    };
   }, [loaded]);
 }

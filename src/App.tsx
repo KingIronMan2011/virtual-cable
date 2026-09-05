@@ -3,7 +3,8 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import {
   AlertCircle,
-  CheckCircle2,
+  AudioLines,
+  CircleDot,
   Download,
   ExternalLink,
   Hexagon,
@@ -310,8 +311,14 @@ export default function App() {
   return (
     <div className="app-root">
       <header className="app-header">
-        <div className="header-brand">
-          <span className="brand-mark">VIRTUAL CABLE</span>
+        <div className="header-brand" aria-label="Virtual Cable">
+          <span className="brand-icon">
+            <AudioLines size={17} strokeWidth={2.2} />
+          </span>
+          <div className="brand-copy">
+            <span className="brand-mark">Virtual Cable</span>
+            <span className="brand-subtitle">Audio router</span>
+          </div>
         </div>
 
         <div className="header-meta">
@@ -331,8 +338,8 @@ export default function App() {
           <div className="meta-divider" />
           {vbInstalled === true ? (
             <span className="meta-vb-ok">
-              <CheckCircle2 size={13} strokeWidth={2.5} />
-              VB-Audio
+              <CircleDot size={12} strokeWidth={2.5} />
+              Driver ready
             </span>
           ) : (
             <button
@@ -370,7 +377,20 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        <div className="cables-container">
+        <section className="workspace-heading">
+          <div>
+            <p className="eyebrow">Routing workspace</p>
+            <h1>Audio routes</h1>
+            <p className="workspace-description">
+              Connect any input to a virtual output and keep your audio moving.
+            </p>
+          </div>
+          <button className="workspace-add" onClick={addTunnel}>
+            <Plus size={16} strokeWidth={2.5} />
+            Add route
+          </button>
+        </section>
+        <div className="cables-container" aria-label="Audio routes">
           <TunnelList
             tunnels={tunnels}
             togglingIds={togglingIds}
@@ -392,7 +412,7 @@ export default function App() {
 
       <button className="fab-new" onClick={addTunnel}>
         <Plus size={14} strokeWidth={2.5} />
-        New Cable
+        Add route
       </button>
 
       {/* Idle toast — shown when VB-Audio missing and install not started */}

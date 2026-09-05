@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import packageJson from "../../package.json";
 import type { AppSettings, UpdateState } from "../types";
 import { tauriAPI } from "../tauriAPI";
@@ -67,20 +67,24 @@ export default function SettingsPanel({ open, onClose }: Props) {
   // Load settings and current update state on open
   useEffect(() => {
     if (!open) return;
-    tauriAPI.loadSettings().then((s) => {
-      setSettings((prev) => ({
-        ...prev,
-        ...s,
-        hotkeys: {
-          ...prev.hotkeys,
-          ...(s.hotkeys || {}),
-        },
-      }));
-      // Only check update state if autoUpdate is enabled
-      if (s.autoUpdate) {
-        tauriAPI.getUpdateState().then(setUpdateState);
-      }
-    });
+    tauriAPI
+      .loadSettings()
+      .then((s) => {
+        setSettings((prev) => ({
+          ...prev,
+          ...s,
+          hotkeys: {
+            ...prev.hotkeys,
+            ...(s.hotkeys || {}),
+          },
+        }));
+        if (s.autoUpdate) {
+          void tauriAPI.getUpdateState().then(setUpdateState);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load settings:", error);
+      });
   }, [open]);
 
   // Subscribe to live update status pushes from main process
@@ -159,7 +163,15 @@ export default function SettingsPanel({ open, onClose }: Props) {
       {/* Panel */}
       <aside className={`settings-panel${open ? "is-open" : ""}`}>
         <div className="settings-header">
-          <span className="settings-title">Settings</span>
+          <div className="settings-heading">
+            <span className="settings-heading-icon">
+              <SlidersHorizontal size={16} strokeWidth={2.1} />
+            </span>
+            <div>
+              <span className="settings-title">Settings</span>
+              <span className="settings-subtitle">Application preferences</span>
+            </div>
+          </div>
           <button className="settings-close" onClick={onClose}>
             <X size={15} strokeWidth={2} />
           </button>

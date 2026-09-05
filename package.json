@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "dotenv -- tauri build --ci",
+    "build:frontend": "vite build",
     "postbuild": "shx cp src-tauri/target/release/bundle/nsis/* website/public/releases/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
