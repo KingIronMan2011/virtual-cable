@@ -85,7 +85,34 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          mapfile -t files < <(find release-assets -type f \( -name '*.exe' -o -name '*.sig' \))
+          installer=$(find release-assets -type f -name '*.exe' -print -quit)
+          signature_file="${installer}.sig"
+
+          if [[ -z "$installer" || ! -f "$signature_file" ]]; then
+            echo "Expected an installer and its .sig file."
+            exit 1
+          fi
+
+          installer_name=$(basename "$installer")
+          installer_url_name=${installer_name// /%20}
+          signature=$(tr -d '\r\n' < "$signature_file")
+          cat > release-assets/updates.json << EOF
+          {
+            "version": "${{ needs.prepare.outputs.version }}",
+            "notes": "See the GitHub Release for details.",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "$signature",
+                "url": "https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/$installer_url_name"
+              }
+            }
+          }
+          EOF
+
+          jq empty release-assets/updates.json
+
+          mapfile -t files < <(find release-assets -type f \( -name '*.exe' -o -name '*.sig' -o -name 'updates.json' \))
           gh release create "v${{ needs.prepare.outputs.version }}" \
             --title "Virtual Cable v${{ needs.prepare.outputs.version }}" \
             --generate-notes \
