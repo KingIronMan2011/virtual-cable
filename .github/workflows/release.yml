@@ -114,6 +114,7 @@ jobs:
 
           mapfile -t files < <(find release-assets -type f \( -name '*.exe' -o -name '*.sig' -o -name 'updates.json' \))
           gh release create "v${{ needs.prepare.outputs.version }}" \
+            --repo "${{ github.repository }}" \
             --title "Virtual Cable v${{ needs.prepare.outputs.version }}" \
             --generate-notes \
             "${files[@]}"

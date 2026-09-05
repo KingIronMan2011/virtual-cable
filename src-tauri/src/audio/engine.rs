@@ -58,20 +58,12 @@ pub fn create_tunnel(
     id: String,
     inputs: Vec<TunnelInputConfig>,
     output_device_id: i32,
-    frames_per_buffer: u32,
     requested_channels: u32,
     ducking: DuckingConfig,
 ) {
     destroy_tunnel(&id);
 
-    match build_tunnel(
-        id.clone(),
-        inputs,
-        output_device_id,
-        frames_per_buffer,
-        requested_channels,
-        ducking,
-    ) {
+    match build_tunnel(inputs, output_device_id, requested_channels, ducking) {
         Ok(tunnel) => {
             let mut map = TUNNELS.lock();
             map.insert(id, tunnel);

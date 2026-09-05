@@ -6,7 +6,6 @@ use tauri::{AppHandle, Emitter, Manager};
 pub mod audio;
 pub mod storage;
 pub mod system;
-pub mod ui;
 
 // --- Data Models ---
 
@@ -117,7 +116,6 @@ fn create_tunnel(
         id,
         inputs,
         output_id,
-        256,
         channel_count.unwrap_or(2) as u32,
         ducking_cfg,
     );

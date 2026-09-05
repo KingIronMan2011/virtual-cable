@@ -18,7 +18,6 @@ pub struct TunnelInputConfig {
 }
 
 pub struct TunnelState {
-    pub id: String,
     pub sample_rate: i32,
     pub channel_count: i32,
     pub output_stream: cpal::Stream,
@@ -65,10 +64,8 @@ pub struct DuckingState {
 }
 
 pub fn build_tunnel(
-    id: String,
     inputs: Vec<TunnelInputConfig>,
     output_device_id: i32,
-    _frames_per_buffer: u32,
     requested_channels: u32,
     ducking: DuckingConfig,
 ) -> Result<TunnelState, String> {
@@ -340,7 +337,6 @@ pub fn build_tunnel(
     output_stream.play().map_err(|e| e.to_string())?;
 
     Ok(TunnelState {
-        id,
         sample_rate: sample_rate as i32,
         channel_count: channels as i32,
         output_stream,

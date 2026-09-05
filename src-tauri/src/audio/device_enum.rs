@@ -130,24 +130,3 @@ pub fn get_audio_devices() -> Vec<AudioDevice> {
     }
     devices
 }
-
-pub fn get_input_devices() -> Vec<AudioDevice> {
-    get_audio_devices()
-        .into_iter()
-        .filter(|d| d.max_input_channels > 0)
-        .collect()
-}
-
-pub fn get_output_devices() -> Vec<AudioDevice> {
-    get_audio_devices()
-        .into_iter()
-        .filter(|d| d.max_output_channels > 0)
-        .collect()
-}
-
-pub fn find_device_by_name(name: &str) -> Option<AudioDevice> {
-    let name_lower = name.to_lowercase();
-    get_audio_devices()
-        .into_iter()
-        .find(|d| d.name.to_lowercase().contains(&name_lower))
-}

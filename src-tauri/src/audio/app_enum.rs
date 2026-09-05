@@ -136,19 +136,6 @@ pub fn get_audio_apps() -> Vec<AudioApp> {
     Vec::new()
 }
 
-/// Find an app by PID
-pub fn find_app_by_pid(pid: u32) -> Option<AudioApp> {
-    get_audio_apps().into_iter().find(|a| a.pid == pid)
-}
-
-/// Find an app by executable name (case-insensitive)
-pub fn find_app_by_exe(exe_name: &str) -> Option<AudioApp> {
-    let exe_lower = exe_name.to_lowercase();
-    get_audio_apps()
-        .into_iter()
-        .find(|a| a.exe.to_lowercase().contains(&exe_lower))
-}
-
 /// Get all unique executable names currently with audio
 pub fn get_audio_app_names() -> Vec<String> {
     let mut names: Vec<_> = get_audio_apps().into_iter().map(|a| a.exe).collect();
