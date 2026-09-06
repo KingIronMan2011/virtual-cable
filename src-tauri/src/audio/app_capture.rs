@@ -320,9 +320,6 @@ mod platform {
 
         /// Stop capture and join the background thread.
         pub fn stop(&mut self) {
-            if !self.running.load(Ordering::SeqCst) {
-                return;
-            }
             self.running.store(false, Ordering::SeqCst);
             if let Some(handle) = self.capture_thread.take() {
                 let _ = handle.join();
@@ -418,6 +415,7 @@ mod platform {
                 drop(op);
 
                 Ok(ActivatedCapture {
+                    pid,
                     client,
                     capture,
                     format,
@@ -434,6 +432,7 @@ mod platform {
 
     /// Holds the activated COM objects needed for the capture loop
     struct ActivatedCapture {
+        pid: u32,
         client: IAudioClient,
         capture: IAudioCaptureClient,
         format: WaveFormat,
@@ -469,8 +468,8 @@ mod platform {
         let sys_bits = fmt.bits_per_sample;
 
         eprintln!(
-            "[app-capture] capture started fmt={} ch={} rate={} bits={}",
-            fmt.format_tag, sys_ch, fmt.sample_rate, sys_bits
+            "[app-capture] capture started pid={} fmt={} ch={} rate={} bits={}",
+            activated.pid, fmt.format_tag, sys_ch, fmt.sample_rate, sys_bits
         );
 
         let mut chunk_buf: Vec<f32> = Vec::new();
@@ -585,6 +584,7 @@ mod platform {
         }
 
         let _ = unsafe { client.Stop() };
+        running.store(false, Ordering::SeqCst);
         unsafe { CoUninitialize() };
         log::info!("[app-capture] capture loop stopped");
     }

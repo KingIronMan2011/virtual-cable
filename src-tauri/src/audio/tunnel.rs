@@ -111,7 +111,9 @@ pub fn build_tunnel(
 
     // Setup inputs
     for input_cfg in inputs {
-        let rb = HeapRb::<f32>::new(sample_rate as usize * channels as usize * 2); // 2x buffer for safety
+        // Keep four seconds of mixed audio per source. This decouples Windows'
+        // device callback timing from the output callback during short stalls.
+        let rb = HeapRb::<f32>::new(sample_rate as usize * channels as usize * 4);
         let (mut prod, cons) = rb.split();
 
         let gain_atomic = Arc::new(AtomicU32::new(input_cfg.gain.to_bits()));
@@ -138,25 +140,14 @@ pub fn build_tunnel(
         } else if let Some(in_device) =
             crate::audio::device_enum::get_cpal_device_by_id(input_cfg.device_id)
         {
-            let mut in_cfg = config;
-            if let Ok(supported_configs) = in_device.supported_input_configs() {
-                let mut found_supported = false;
-                for supported in supported_configs {
-                    if supported.channels() >= channels
-                        && supported.min_sample_rate() <= sample_rate
-                        && supported.max_sample_rate() >= sample_rate
-                    {
-                        found_supported = true;
-                        break;
-                    }
-                }
-                if !found_supported {
-                    if let Ok(def_in_cfg) = in_device.default_input_config() {
-                        in_cfg.channels = def_in_cfg.channels();
-                        in_cfg.sample_rate = def_in_cfg.sample_rate();
-                    }
-                }
-            }
+            // Open physical inputs in their native shared-mode format. Forcing a
+            // microphone to match a high-rate output (for example 192 kHz) causes
+            // WASAPI/CPAL under- and overruns on many drivers. The callback below
+            // already handles channel mapping and rate conversion.
+            let in_cfg = in_device
+                .default_input_config()
+                .map(|supported| supported.config())
+                .unwrap_or(config);
 
             let in_channels = in_cfg.channels as usize;
             let out_channels = channels as usize;
@@ -167,6 +158,10 @@ pub fn build_tunnel(
             let mut current_frame = vec![0.0; in_channels.max(1)];
             let mut fraction = 0.0;
             let step = in_rate / out_rate;
+
+            let device_id = input_cfg.device_id;
+            let error_reported = Arc::new(AtomicBool::new(false));
+            let error_reported_callback = Arc::clone(&error_reported);
 
             let stream_res = in_device.build_input_stream(
                 in_cfg,
@@ -196,7 +191,13 @@ pub fn build_tunnel(
                         }
                     }
                 },
-                |err| eprintln!("Input stream error: {}", err),
+                move |err| {
+                    // Recoverable device notifications should not flood the
+                    // console or mark an otherwise healthy route as offline.
+                    if !error_reported_callback.swap(true, Ordering::Relaxed) {
+                        eprintln!("[tunnel] input device #{device_id} stream warning: {err}");
+                    }
+                },
                 None,
             );
 

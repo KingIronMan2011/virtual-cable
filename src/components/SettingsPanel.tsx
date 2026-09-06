@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { SlidersHorizontal, X } from "lucide-react";
 import packageJson from "../../package.json";
 import type { AppSettings, UpdateState } from "../types";
@@ -152,7 +153,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
 
   const statusText = STATUS_LABEL[updateState.status];
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -161,7 +162,12 @@ export default function SettingsPanel({ open, onClose }: Props) {
       />
 
       {/* Panel */}
-      <aside className={`settings-panel${open ? "is-open" : ""}`}>
+      <aside
+        className={`settings-panel${open ? "is-open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+      >
         <div className="settings-header">
           <div className="settings-heading">
             <span className="settings-heading-icon">
@@ -359,6 +365,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
           </section>
         </div>
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }

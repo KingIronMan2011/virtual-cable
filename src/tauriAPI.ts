@@ -7,9 +7,12 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import type { AudioDevice, Tunnel, AppSettings, UpdateState } from "./types";
 
 function updateError(error: unknown): UpdateState {
+  const message = error instanceof Error ? error.message : String(error);
   return {
     status: "error",
-    error: error instanceof Error ? error.message : String(error),
+    error: message.includes("valid release JSON")
+      ? "No release metadata has been published yet."
+      : "The update service is unavailable. Try again later.",
   };
 }
 

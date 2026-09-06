@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ArrowRight,
   GripVertical,
   Plus,
   Power,
@@ -71,36 +72,6 @@ export default function TunnelCard({
     tunnel.outputDeviceId !== null;
 
   const vuBarRef = useRef<HTMLDivElement>(null);
-  const cableRef = useRef<HTMLDivElement>(null);
-  const inputRowsRef = useRef<HTMLDivElement>(null);
-  // Pixel-accurate bounds of the input-rows area within the cable column.
-  // The output jack is always placed at (top + bot) / 2 — the vertical midpoint
-  // of all input jacks — so for 2 inputs it falls between them, for 3 on the middle one, etc.
-  const [cableH, setCableH] = useState(48);
-  const [anchors, setAnchors] = useState({ top: 0, bot: 48 });
-
-  useLayoutEffect(() => {
-    const measure = () => {
-      const cable = cableRef.current;
-      if (!cable) return;
-      const cr = cable.getBoundingClientRect();
-      setCableH(Math.round(cr.height));
-      let top = 0,
-        bot = cr.height;
-      const rows = inputRowsRef.current;
-      if (rows) {
-        const rr = rows.getBoundingClientRect();
-        top = rr.top - cr.top;
-        bot = rr.bottom - cr.top;
-      }
-      setAnchors({ top, bot });
-    };
-    measure();
-    const obs = new ResizeObserver(measure);
-    if (cableRef.current) obs.observe(cableRef.current);
-    return () => obs.disconnect();
-  }, [tunnel.inputs.length]);
-
   const [sampleRate, setSampleRate] = useState<number | null>(null);
   const [activeChannelCount, setActiveChannelCount] = useState<number | null>(
     null,
@@ -213,11 +184,6 @@ export default function TunnelCard({
         : `${sampleRate} Hz`
       : null;
 
-  // Pixel offset from the grid-row centre to the cable's output jack.
-  // Used to translateY the output column so its centre matches the jack exactly.
-  const outputJackY = (anchors.top + anchors.bot) / 2;
-  const outputColShift = outputJackY - cableH / 2;
-
   return (
     <div
       className={`cable-card${tunnel.active ? "is-active" : ""}`}
@@ -284,7 +250,7 @@ export default function TunnelCard({
         {/* Inputs column */}
         <div className="io-col">
           <span className="io-label">In</span>
-          <div ref={inputRowsRef} className="input-rows">
+          <div className="input-rows">
             {tunnel.inputs.map((inp, i) => (
               <div key={i} className="input-row">
                 <select
@@ -381,103 +347,15 @@ export default function TunnelCard({
           </button>
         </div>
 
-        {/* Cable topology — SVG bezier curves: N inputs → smooth merge → output */}
-        <div ref={cableRef} className="cable-connector">
-          {(() => {
-            const n = tunnel.inputs.length;
-            const act = tunnel.active;
-            // Real pixel coordinates derived from measured DOM positions so jacks
-            // align with the actual select/label elements, not the full grid row.
-            const W = 80,
-              H = cableH;
-            const jx = 12,
-              bx = 40,
-              ox = 68;
-            const mx = (jx + bx) / 2; // bezier control-point x
-            const span = anchors.bot - anchors.top;
-            const ys = Array.from(
-              { length: n },
-              (_, i) => anchors.top + ((2 * i + 1) / (2 * n)) * span,
-            );
-            // Output jack sits at the vertical midpoint of all input jacks:
-            // midpoint of 2 → between them; midpoint of 3 → on the middle one; etc.
-            const oy = (anchors.top + anchors.bot) / 2;
-            return (
-              <svg
-                viewBox={`0 0 ${W} ${H}`}
-                width={W}
-                height={H}
-                className="cable-svg"
-              >
-                {/* Branch curves: each input bezier-curves into the central junction */}
-                {ys.map((iy, i) => (
-                  <path
-                    key={i}
-                    d={
-                      n === 1
-                        ? `M ${jx} ${oy} L ${ox} ${oy}`
-                        : `M ${jx} ${iy} C ${mx} ${iy} ${mx} ${oy} ${bx} ${oy}`
-                    }
-                    fill="none"
-                    className={`c-branch${act ? "is-active" : ""}`}
-                  />
-                ))}
-                {/* Output track (multi-input only; single reuses the branch path) */}
-                {n > 1 && (
-                  <line
-                    x1={bx}
-                    y1={oy}
-                    x2={ox}
-                    y2={oy}
-                    className={`c-branch${act ? "is-active" : ""}`}
-                  />
-                )}
-                {/* Animated pulse travelling along the output segment */}
-                {act && (
-                  <line
-                    x1={n > 1 ? bx : jx}
-                    y1={oy}
-                    x2={ox}
-                    y2={oy}
-                    className="c-pulse"
-                  />
-                )}
-                {/* Input jacks */}
-                {ys.map((iy, i) => (
-                  <circle
-                    key={i}
-                    cx={jx}
-                    cy={iy}
-                    r={5}
-                    className={`c-jack${act ? "is-active" : ""}`}
-                  />
-                ))}
-                {/* Junction dot where all branches converge */}
-                {n > 1 && (
-                  <circle
-                    cx={bx}
-                    cy={oy}
-                    r={4}
-                    className={`c-jack${act ? "is-active" : ""}`}
-                  />
-                )}
-                {/* Output jack */}
-                <circle
-                  cx={ox}
-                  cy={oy}
-                  r={5}
-                  className={`c-jack${act ? "is-active" : ""}`}
-                />
-              </svg>
-            );
-          })()}
+        <div
+          className={`cable-connector${tunnel.active ? "is-active" : ""}`}
+          aria-hidden="true"
+        >
+          <span className="connector-line" />
+          <ArrowRight size={17} strokeWidth={2} />
         </div>
 
-        {/* Output column — shifted so its centre aligns with the cable's output jack */}
-        <div
-          className="io-col io-col--out"
-          style={{ transform: `translateY(${outputColShift}px)` }}
-        >
+        <div className="io-col io-col--out">
           <span className="io-label">Out</span>
           <select
             className="device-select"

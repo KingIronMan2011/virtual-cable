@@ -410,10 +410,12 @@ export default function App() {
         </div>
       </main>
 
-      <button className="fab-new" onClick={addTunnel}>
-        <Plus size={14} strokeWidth={2.5} />
-        Add route
-      </button>
+      {!settingsOpen && (
+        <button className="fab-new" onClick={addTunnel}>
+          <Plus size={14} strokeWidth={2.5} />
+          Add route
+        </button>
+      )}
 
       {/* Idle toast — shown when VB-Audio missing and install not started */}
       {showToast && (
