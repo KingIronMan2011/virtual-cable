@@ -26,7 +26,6 @@
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv-cli": "^11.0.0",
     "eslint": "^10.10.0",
-    "pathe": "^2.0.3",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "sharp": "^0.35.4",
